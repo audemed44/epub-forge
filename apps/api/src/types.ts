@@ -1,4 +1,4 @@
-import type { BuildFromSelectionInput, BuildProgress } from "@scraper-epub/core";
+import type { BuildFromSelectionInput, BuildProgress } from "@epub-forge/core";
 
 export type BuildJobStatus = "queued" | "running" | "done" | "error";
 
