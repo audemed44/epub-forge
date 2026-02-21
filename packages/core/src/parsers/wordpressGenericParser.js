@@ -7,7 +7,7 @@ export class WordpressGenericParser extends BaseParser {
 
   canHandle(url) {
     const host = new URL(url).hostname.toLowerCase();
-    return host.includes("wordpress") || host.endsWith(".blog") || host.endsWith(".com");
+    return host.includes("wordpress") || host.endsWith(".blog");
   }
 
   contentSelector() {
@@ -26,6 +26,9 @@ export class WordpressGenericParser extends BaseParser {
     const coverImageUrl = $("meta[property='og:image']").attr("content") || null;
 
     const content = $(this.contentSelector()).first();
+    if (!content.length || !title) {
+      throw new Error("Could not detect a supported WordPress chapter page");
+    }
     const baseHost = new URL(url).hostname;
     const links = [];
     content.find("a[href]").each((_i, el) => {
@@ -61,7 +64,15 @@ export class WordpressGenericParser extends BaseParser {
     const { $ } = await fetchDom(chapterUrl);
     const title = $(this.titleSelector()).first().text().trim() || $("title").text().trim() || "Chapter";
     const content = $(this.contentSelector()).first();
+    if (!content.length) {
+      throw new Error("Could not detect chapter content for this page");
+    }
     content.find("script, style, nav, .sharedaddy, .jp-relatedposts").remove();
+    content.find("a[rel='next'], a[rel='prev']").remove();
+    content.find("a").filter((_i, element) => {
+      const text = ($(element).text() || "").toLowerCase();
+      return text.includes("next chapter") || text.includes("previous chapter");
+    }).remove();
 
     return {
       sourceUrl: chapterUrl,

@@ -346,6 +346,7 @@ export async function buildEpub(metadata, chapters) {
   oebps.file("nav.xhtml", navXhtml(chapters));
 
   const epubBuffer = await zip.generateAsync({ type: "nodebuffer", mimeType: "application/epub+zip" });
-  const filename = `${sanitizeFilename(metadata.title)}.epub`;
+  const baseName = metadata.fileName || metadata.title;
+  const filename = `${sanitizeFilename(baseName)}.epub`;
   return { epubBuffer, filename };
 }

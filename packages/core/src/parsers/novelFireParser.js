@@ -169,11 +169,35 @@ export class NovelFireParser extends BaseParser {
     const title = $("span.chapter-title").first().text().trim() || $("h1").first().text().trim() || "Chapter";
     const content = $("div.chapter-content, div#content").first();
     content.find("script, style, .ads, .advertisement").remove();
+    this.removeWatermarkParagraphs($, content);
+    this.removeNestedStrongTags($, content);
+    this.removeDlInfoBlocks($, content);
 
     return {
       sourceUrl: chapterUrl,
       title,
       contentHtml: `<div>${content.html() || ""}</div>`,
     };
+  }
+
+  removeWatermarkParagraphs($, content) {
+    content.find("p").each((_i, element) => {
+      const className = ($(element).attr("class") || "").trim();
+      if (className) {
+        $(element).remove();
+      }
+    });
+  }
+
+  removeNestedStrongTags($, content) {
+    content.find("strong strong").each((_i, element) => {
+      $(element).parent().remove();
+    });
+  }
+
+  removeDlInfoBlocks($, content) {
+    content.find("div > dl > dt").each((_i, element) => {
+      $(element).parent().parent().remove();
+    });
   }
 }

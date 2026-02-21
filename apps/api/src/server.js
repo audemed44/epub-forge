@@ -3,11 +3,13 @@ import cors from "cors";
 import morgan from "morgan";
 import fs from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { buildFromSelection, listParsers, previewUrl } from "@scraper-epub/core";
 
 const app = express();
 const port = process.env.PORT || 3000;
+const buildJobs = new Map();
 
 function safeAsciiFilename(filename) {
   const cleaned = (filename || "book.epub")
@@ -63,6 +65,93 @@ app.post("/api/build", async (req, res) => {
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }
+});
+
+app.post("/api/build-jobs", async (req, res) => {
+  try {
+    const { url, parserId = null, metadata, chapterUrls = [] } = req.body || {};
+    if (!url || !metadata) {
+      return res.status(400).json({ error: "url and metadata are required" });
+    }
+
+    const jobId = randomUUID();
+    const job = {
+      id: jobId,
+      status: "queued",
+      progress: { stage: "queued", completed: 0, total: chapterUrls.length || 0 },
+      logs: [],
+      createdAt: Date.now(),
+      finishedAt: null,
+      error: null,
+      result: null,
+    };
+    buildJobs.set(jobId, job);
+
+    setImmediate(async () => {
+      job.status = "running";
+      try {
+        const built = await buildFromSelection(
+          { url, parserId, metadata, chapterUrls },
+          {
+            onProgress: (progress) => {
+              job.progress = progress;
+            },
+            onLog: (message) => {
+              job.logs.push(`${new Date().toISOString()} ${message}`);
+              if (job.logs.length > 200) {
+                job.logs.shift();
+              }
+            },
+          }
+        );
+        job.status = "done";
+        job.result = built;
+        job.finishedAt = Date.now();
+      } catch (error) {
+        job.status = "error";
+        job.error = error.message;
+        job.finishedAt = Date.now();
+      }
+    });
+
+    return res.json({ jobId });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/build-jobs/:jobId", (req, res) => {
+  const job = buildJobs.get(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({ error: "job not found" });
+  }
+
+  return res.json({
+    id: job.id,
+    status: job.status,
+    progress: job.progress,
+    logs: job.logs,
+    error: job.error,
+    createdAt: job.createdAt,
+    finishedAt: job.finishedAt,
+    hasResult: !!job.result,
+  });
+});
+
+app.get("/api/build-jobs/:jobId/file", (req, res) => {
+  const job = buildJobs.get(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({ error: "job not found" });
+  }
+  if (job.status !== "done" || !job.result) {
+    return res.status(409).json({ error: "job not complete" });
+  }
+
+  const asciiFilename = safeAsciiFilename(job.result.filename);
+  const utf8Filename = encodeURIComponent((job.result.filename || "book.epub").replace(/[\r\n]/g, " "));
+  res.setHeader("Content-Type", "application/epub+zip");
+  res.setHeader("Content-Disposition", `attachment; filename="${asciiFilename}"; filename*=UTF-8''${utf8Filename}`);
+  return res.send(job.result.epubBuffer);
 });
 
 const __filename = fileURLToPath(import.meta.url);
