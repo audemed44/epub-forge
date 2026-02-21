@@ -69,14 +69,32 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const builtWebRoot = path.resolve(__dirname, "../../web/dist");
 const legacyWebRoot = path.resolve(__dirname, "../../web/public");
-const webRoot = fs.existsSync(builtWebRoot) ? builtWebRoot : legacyWebRoot;
-app.use(express.static(webRoot));
 
-app.get("*", (_req, res) => {
-  res.sendFile(path.join(webRoot, "index.html"));
-});
+async function start() {
+  if (process.env.ONE_PORT_DEV === "1") {
+    const { createServer: createViteServer } = await import("vite");
+    const vite = await createViteServer({
+      root: path.resolve(__dirname, "../../web"),
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    const webRoot = fs.existsSync(builtWebRoot) ? builtWebRoot : legacyWebRoot;
+    app.use(express.static(webRoot));
+    app.get("*", (_req, res) => {
+      res.sendFile(path.join(webRoot, "index.html"));
+    });
+  }
 
-app.listen(port, () => {
+  app.listen(port, () => {
+    // eslint-disable-next-line no-console
+    console.log(`scraper-epub listening on :${port}`);
+  });
+}
+
+start().catch((error) => {
   // eslint-disable-next-line no-console
-  console.log(`scraper-epub listening on :${port}`);
+  console.error(error);
+  process.exit(1);
 });

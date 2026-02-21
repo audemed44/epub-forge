@@ -238,7 +238,9 @@ export function App() {
   return (
     <main className="shell">
       <section className="hero">
-        <p className="eyebrow">Self-hosted WebToEpub</p>
+        <div className="hero-top">
+          <p className="eyebrow">Self-hosted WebToEpub</p>
+        </div>
         <h1>Build EPUBs from your phone</h1>
         <p className="lead">
           Preview chapters, adjust metadata, set a custom cover URL if needed, choose a chapter range, and build.

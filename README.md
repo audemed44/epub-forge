@@ -15,8 +15,7 @@ npm run dev
 
 This starts:
 
-- API server on `http://localhost:3000`
-- React dev server on `http://localhost:5173` (proxies `/api` to `:3000`)
+- One-port dev server on `http://localhost:3000` (API + Vite UI middleware)
 
 For production-style local run:
 
