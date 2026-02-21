@@ -8,38 +8,90 @@ const el = {
   status: document.getElementById("status"),
   previewBtn: document.getElementById("previewBtn"),
   buildBtn: document.getElementById("buildBtn"),
-  selectAllBtn: document.getElementById("selectAllBtn"),
-  selectNoneBtn: document.getElementById("selectNoneBtn"),
   metaPanel: document.getElementById("metaPanel"),
   chaptersPanel: document.getElementById("chaptersPanel"),
   title: document.getElementById("titleInput"),
   author: document.getElementById("authorInput"),
   language: document.getElementById("languageInput"),
   description: document.getElementById("descriptionInput"),
-  chaptersBody: document.getElementById("chaptersBody"),
+  startChapterSelect: document.getElementById("startChapterSelect"),
+  endChapterSelect: document.getElementById("endChapterSelect"),
+  rangeSummary: document.getElementById("rangeSummary"),
 };
 
 function setStatus(message) {
   el.status.textContent = message;
 }
 
-function renderChapters(chapters) {
-  el.chaptersBody.innerHTML = "";
-  for (const chapter of chapters) {
-    const row = document.createElement("tr");
-    row.innerHTML = `
-      <td><input type="checkbox" data-url="${chapter.sourceUrl}" checked /></td>
-      <td>${chapter.title}</td>
-      <td><a href="${chapter.sourceUrl}" target="_blank" rel="noopener">${chapter.sourceUrl}</a></td>
-    `;
-    el.chaptersBody.appendChild(row);
+function chapterLabel(chapter, index) {
+  const number = String(index + 1).padStart(4, "0");
+  return `${number} - ${chapter.title}`;
+}
+
+function renderChapterRange(chapters) {
+  el.startChapterSelect.innerHTML = "";
+  el.endChapterSelect.innerHTML = "";
+
+  chapters.forEach((chapter, index) => {
+    const startOption = document.createElement("option");
+    startOption.value = String(index);
+    startOption.textContent = chapterLabel(chapter, index);
+    el.startChapterSelect.appendChild(startOption);
+
+    const endOption = document.createElement("option");
+    endOption.value = String(index);
+    endOption.textContent = chapterLabel(chapter, index);
+    el.endChapterSelect.appendChild(endOption);
+  });
+
+  if (chapters.length) {
+    el.startChapterSelect.value = "0";
+    el.endChapterSelect.value = String(chapters.length - 1);
+  }
+  updateRangeSummary();
+}
+
+function getSelectedRange() {
+  if (!state.chapters.length) {
+    return { start: 0, end: -1 };
+  }
+  const start = Number(el.startChapterSelect.value || 0);
+  const end = Number(el.endChapterSelect.value || 0);
+  return {
+    start: Math.max(0, Math.min(start, state.chapters.length - 1)),
+    end: Math.max(0, Math.min(end, state.chapters.length - 1)),
+  };
+}
+
+function syncRange(orderSource) {
+  const { start, end } = getSelectedRange();
+  if (start <= end) {
+    return;
+  }
+
+  if (orderSource === "start") {
+    el.endChapterSelect.value = String(start);
+  } else {
+    el.startChapterSelect.value = String(end);
   }
 }
 
+function updateRangeSummary() {
+  if (!state.chapters.length) {
+    el.rangeSummary.textContent = "";
+    return;
+  }
+
+  const { start, end } = getSelectedRange();
+  const count = end - start + 1;
+  const startTitle = state.chapters[start]?.title || "";
+  const endTitle = state.chapters[end]?.title || "";
+  el.rangeSummary.textContent = `Selected ${count} chapters (from \"${startTitle}\" to \"${endTitle}\")`;
+}
+
 function selectedChapterUrls() {
-  return [...el.chaptersBody.querySelectorAll("input[type='checkbox']")]
-    .filter((cb) => cb.checked)
-    .map((cb) => cb.dataset.url);
+  const { start, end } = getSelectedRange();
+  return state.chapters.slice(start, end + 1).map((chapter) => chapter.sourceUrl);
 }
 
 async function preview() {
@@ -69,7 +121,7 @@ async function preview() {
     el.author.value = data.metadata.author || "";
     el.language.value = data.metadata.language || "en";
     el.description.value = data.metadata.description || "";
-    renderChapters(data.chapters);
+    renderChapterRange(data.chapters);
 
     el.metaPanel.classList.remove("hidden");
     el.chaptersPanel.classList.remove("hidden");
@@ -84,7 +136,7 @@ async function preview() {
 async function build() {
   const chapterUrls = selectedChapterUrls();
   if (!chapterUrls.length) {
-    setStatus("Select at least one chapter");
+    setStatus("Select a valid chapter range");
     return;
   }
 
@@ -128,7 +180,7 @@ async function build() {
     a.remove();
     URL.revokeObjectURL(href);
 
-    setStatus(`Download ready: ${filename}`);
+    setStatus(`Download ready: ${filename} (${chapterUrls.length} chapters)`);
   } catch (error) {
     setStatus(error.message);
   } finally {
@@ -136,13 +188,13 @@ async function build() {
   }
 }
 
-function setAllSelected(value) {
-  [...el.chaptersBody.querySelectorAll("input[type='checkbox']")].forEach((cb) => {
-    cb.checked = value;
-  });
-}
-
 el.previewBtn.addEventListener("click", preview);
 el.buildBtn.addEventListener("click", build);
-el.selectAllBtn.addEventListener("click", () => setAllSelected(true));
-el.selectNoneBtn.addEventListener("click", () => setAllSelected(false));
+el.startChapterSelect.addEventListener("change", () => {
+  syncRange("start");
+  updateRangeSummary();
+});
+el.endChapterSelect.addEventListener("change", () => {
+  syncRange("end");
+  updateRangeSummary();
+});

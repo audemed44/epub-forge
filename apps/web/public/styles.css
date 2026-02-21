@@ -60,6 +60,10 @@ h1, h2 {
   gap: 0.75rem;
 }
 
+.range-grid {
+  margin-bottom: 0.4rem;
+}
+
 label {
   display: flex;
   flex-direction: column;

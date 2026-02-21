@@ -33,22 +33,17 @@
       <section id="chaptersPanel" class="panel hidden">
         <div class="row between">
           <h2>Chapters</h2>
-          <div>
-            <button id="selectAllBtn" type="button">Select all</button>
-            <button id="selectNoneBtn" type="button">Select none</button>
-            <button id="buildBtn" type="button">Build EPUB</button>
-          </div>
+          <button id="buildBtn" type="button">Build EPUB</button>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th></th>
-              <th>Title</th>
-              <th>URL</th>
-            </tr>
-          </thead>
-          <tbody id="chaptersBody"></tbody>
-        </table>
+        <div class="grid range-grid">
+          <label>Start chapter
+            <select id="startChapterSelect"></select>
+          </label>
+          <label>End chapter
+            <select id="endChapterSelect"></select>
+          </label>
+        </div>
+        <p id="rangeSummary" class="hint"></p>
       </section>
     </main>
 
