@@ -74,6 +74,8 @@ export function App() {
   const [language, setLanguage] = useState("en");
   const [description, setDescription] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [detectedCoverImageUrl, setDetectedCoverImageUrl] = useState("");
+  const [coverUploadName, setCoverUploadName] = useState("");
 
   const hasPreview = chapters.length > 0;
 
@@ -127,6 +129,8 @@ export function App() {
       setLanguage(data.metadata.language || "en");
       setDescription(data.metadata.description || "");
       setCoverImageUrl(data.metadata.coverImageUrl || "");
+      setDetectedCoverImageUrl(data.metadata.coverImageUrl || "");
+      setCoverUploadName("");
 
       setStatus(`Loaded ${data.chapters.length} chapters with parser '${data.parserId}'.`);
     } catch (error) {
@@ -204,6 +208,33 @@ export function App() {
     }
   }
 
+  async function onCoverUpload(file: File | null) {
+    if (!file) {
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setStatus("Cover upload must be an image file.");
+      return;
+    }
+
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          resolve(reader.result);
+          return;
+        }
+        reject(new Error("Could not read uploaded file."));
+      };
+      reader.onerror = () => reject(new Error("Could not read uploaded file."));
+      reader.readAsDataURL(file);
+    });
+
+    setCoverImageUrl(dataUrl);
+    setCoverUploadName(file.name);
+    setStatus(`Using uploaded cover file: ${file.name}`);
+  }
+
   return (
     <main className="shell">
       <section className="hero">
@@ -258,10 +289,44 @@ export function App() {
             <input
               type="url"
               value={coverImageUrl}
-              onChange={(event) => setCoverImageUrl(event.target.value)}
+              onChange={(event) => {
+                setCoverImageUrl(event.target.value);
+                setCoverUploadName("");
+              }}
               placeholder="https://example.com/cover.jpg"
             />
           </label>
+          <label className="full-width">
+            Upload cover image (optional)
+            <input type="file" accept="image/*" onChange={(event) => void onCoverUpload(event.target.files?.[0] ?? null)} />
+          </label>
+          {coverUploadName ? <p className="cover-upload-name">Uploaded: {coverUploadName}</p> : null}
+          <div className="cover-actions full-width">
+            <button
+              type="button"
+              onClick={() => {
+                setCoverImageUrl(detectedCoverImageUrl);
+                setCoverUploadName("");
+              }}
+            >
+              Use detected cover
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCoverImageUrl("");
+                setCoverUploadName("");
+              }}
+            >
+              Remove cover
+            </button>
+          </div>
+          {coverImageUrl ? (
+            <div className="cover-preview full-width">
+              <p>Cover Preview</p>
+              <img src={coverImageUrl} alt="Cover preview" />
+            </div>
+          ) : null}
         </div>
       </section>
 
