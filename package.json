@@ -1,5 +1,5 @@
 {
-  "name": "scraper-epub",
+  "name": "epub-forge",
   "private": true,
   "version": "0.1.0",
   "workspaces": [
@@ -8,10 +8,10 @@
   ],
   "scripts": {
     "dev": "cross-env ONE_PORT_DEV=1 tsx apps/api/src/server.ts",
-    "build:web": "npm --workspace @scraper-epub/web run build",
+    "build:web": "npm --workspace @epub-forge/web run build",
     "build": "npm run build:web",
     "start": "tsx apps/api/src/server.ts",
-    "typecheck": "npm --workspace @scraper-epub/core run typecheck && npm --workspace @scraper-epub/api run typecheck && npm --workspace @scraper-epub/web run typecheck",
+    "typecheck": "npm --workspace @epub-forge/core run typecheck && npm --workspace @epub-forge/api run typecheck && npm --workspace @epub-forge/web run typecheck",
     "test:smoke": "node scripts/smoke.mjs"
   },
   "devDependencies": {

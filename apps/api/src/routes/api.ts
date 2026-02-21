@@ -1,6 +1,6 @@
 import path from "node:path";
 import { Router } from "express";
-import { buildFromSelection, listParsers, previewUrl } from "@scraper-epub/core";
+import { buildFromSelection, listParsers, previewUrl } from "@epub-forge/core";
 import { safeAsciiFilename } from "../lib/storage.js";
 import { toPublicJob } from "../jobs/presenter.js";
 import type { BuildQueueService } from "../jobs/queueService.js";

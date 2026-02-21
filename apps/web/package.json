@@ -1,5 +1,5 @@
 {
-  "name": "@scraper-epub/web",
+  "name": "@epub-forge/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",

@@ -1,7 +1,7 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { buildFromSelection, type BuildFromSelectionInput } from "@scraper-epub/core";
+import { buildFromSelection, type BuildFromSelectionInput } from "@epub-forge/core";
 import { moveFile, resolveUniqueFilePath } from "../lib/storage.js";
 import { JobsRepository } from "./repository.js";
 import type { BuildJob } from "../types.js";

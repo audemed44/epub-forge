@@ -1,4 +1,4 @@
-# scraper-epub
+# epub-forge
 
 Self-hosted web app version of WebToEpub flow. Current target parsers:
 

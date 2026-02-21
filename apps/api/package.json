@@ -1,5 +1,5 @@
 {
-  "name": "@scraper-epub/api",
+  "name": "@epub-forge/api",
   "version": "0.1.0",
   "type": "module",
   "main": "src/server.ts",
@@ -7,7 +7,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@scraper-epub/core": "0.1.0",
+    "@epub-forge/core": "0.1.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "morgan": "^1.10.0"
