@@ -4,10 +4,12 @@ WORKDIR /app
 
 COPY package.json ./
 COPY apps/api/package.json ./apps/api/package.json
+COPY apps/web/package.json ./apps/web/package.json
 COPY packages/core/package.json ./packages/core/package.json
 RUN npm install
 
 COPY . .
+RUN npm run build
 
 EXPOSE 3000
 CMD ["npm", "start"]

@@ -1,0 +1,305 @@
+import { useMemo, useState } from "react";
+
+type Metadata = {
+  sourceUrl: string;
+  title: string;
+  author: string;
+  language: string;
+  description: string | null;
+  coverImageUrl: string | null;
+};
+
+type ChapterRef = {
+  id: string;
+  sourceUrl: string;
+  title: string;
+};
+
+type PreviewResponse = {
+  parserId: string;
+  metadata: {
+    sourceUrl: string;
+    title: string;
+    author: string;
+    language: string;
+    description: string | null;
+    coverImageUrl: string | null;
+  };
+  chapters: ChapterRef[];
+};
+
+function isPreviewResponse(value: unknown): value is PreviewResponse {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return typeof record.parserId === "string" && Array.isArray(record.chapters) && typeof record.metadata === "object";
+}
+
+function sanitizeFilenameFromHeader(disposition: string | null): string {
+  if (!disposition) {
+    return "book.epub";
+  }
+
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      // ignore decode failure and fallback
+    }
+  }
+
+  const plainMatch = disposition.match(/filename="([^"]+)"/i);
+  return plainMatch?.[1] ?? "book.epub";
+}
+
+function chapterLabel(chapter: ChapterRef, index: number): string {
+  return `${String(index + 1).padStart(4, "0")} - ${chapter.title}`;
+}
+
+export function App() {
+  const [url, setUrl] = useState("");
+  const [status, setStatus] = useState("Paste a URL and preview chapters.");
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [isBuildLoading, setIsBuildLoading] = useState(false);
+
+  const [parserId, setParserId] = useState<string | null>(null);
+  const [chapters, setChapters] = useState<ChapterRef[]>([]);
+  const [startIndex, setStartIndex] = useState(0);
+  const [endIndex, setEndIndex] = useState(0);
+
+  const [title, setTitle] = useState("");
+  const [author, setAuthor] = useState("");
+  const [language, setLanguage] = useState("en");
+  const [description, setDescription] = useState("");
+  const [coverImageUrl, setCoverImageUrl] = useState("");
+
+  const hasPreview = chapters.length > 0;
+
+  const selectedRange = useMemo(() => {
+    const start = Math.max(0, Math.min(startIndex, chapters.length - 1));
+    const end = Math.max(0, Math.min(endIndex, chapters.length - 1));
+    return {
+      start: Math.min(start, end),
+      end: Math.max(start, end),
+    };
+  }, [chapters.length, endIndex, startIndex]);
+
+  const selectedChapters = useMemo(
+    () => chapters.slice(selectedRange.start, selectedRange.end + 1),
+    [chapters, selectedRange.end, selectedRange.start]
+  );
+
+  async function onPreview() {
+    const inputUrl = url.trim();
+    if (!inputUrl) {
+      setStatus("Enter a URL first.");
+      return;
+    }
+
+    setIsPreviewLoading(true);
+    setStatus("Fetching metadata and chapter list...");
+
+    try {
+      const response = await fetch("/api/preview", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: inputUrl }),
+      });
+
+      const data = (await response.json()) as unknown;
+      if (!response.ok || !isPreviewResponse(data)) {
+        const message =
+          typeof data === "object" && data !== null && "error" in data && typeof (data as { error?: unknown }).error === "string"
+            ? (data as { error: string }).error
+            : "Preview failed";
+        throw new Error(message);
+      }
+
+      setParserId(data.parserId);
+      setChapters(data.chapters);
+      setStartIndex(0);
+      setEndIndex(Math.max(data.chapters.length - 1, 0));
+
+      setTitle(data.metadata.title || "");
+      setAuthor(data.metadata.author || "");
+      setLanguage(data.metadata.language || "en");
+      setDescription(data.metadata.description || "");
+      setCoverImageUrl(data.metadata.coverImageUrl || "");
+
+      setStatus(`Loaded ${data.chapters.length} chapters with parser '${data.parserId}'.`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Preview failed");
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  }
+
+  async function onBuild() {
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) {
+      setStatus("Enter a URL first.");
+      return;
+    }
+    if (!parserId) {
+      setStatus("Run preview before building.");
+      return;
+    }
+    if (selectedChapters.length === 0) {
+      setStatus("Pick a valid chapter range.");
+      return;
+    }
+
+    const payload: {
+      url: string;
+      parserId: string;
+      chapterUrls: string[];
+      metadata: Metadata;
+    } = {
+      url: trimmedUrl,
+      parserId,
+      chapterUrls: selectedChapters.map((chapter) => chapter.sourceUrl),
+      metadata: {
+        sourceUrl: trimmedUrl,
+        title: title.trim(),
+        author: author.trim(),
+        language: language.trim() || "en",
+        description: description.trim() || null,
+        coverImageUrl: coverImageUrl.trim() || null,
+      },
+    };
+
+    setIsBuildLoading(true);
+    setStatus("Building EPUB...");
+
+    try {
+      const response = await fetch("/api/build", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const data = (await response.json()) as { error?: string };
+        throw new Error(data.error || "Build failed");
+      }
+
+      const blob = await response.blob();
+      const filename = sanitizeFilenameFromHeader(response.headers.get("content-disposition"));
+      const downloadUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = downloadUrl;
+      anchor.download = filename;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(downloadUrl);
+
+      setStatus(`Downloaded ${filename} (${selectedChapters.length} chapters).`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Build failed");
+    } finally {
+      setIsBuildLoading(false);
+    }
+  }
+
+  return (
+    <main className="shell">
+      <section className="hero">
+        <p className="eyebrow">Self-hosted WebToEpub</p>
+        <h1>Build EPUBs from your phone</h1>
+        <p className="lead">
+          Preview chapters, adjust metadata, set a custom cover URL if needed, choose a chapter range, and build.
+        </p>
+      </section>
+
+      <section className="panel">
+        <label htmlFor="story-url">Story URL</label>
+        <div className="url-row">
+          <input
+            id="story-url"
+            type="url"
+            value={url}
+            onChange={(event) => setUrl(event.target.value)}
+            placeholder="https://novelfire.net/book/a-regressors-tale-of-cultivation"
+          />
+          <button onClick={onPreview} disabled={isPreviewLoading}>
+            {isPreviewLoading ? "Loading..." : "Preview"}
+          </button>
+        </div>
+        <p className="status">{status}</p>
+      </section>
+
+      <section className={`panel ${hasPreview ? "" : "hidden"}`}>
+        <div className="panel-head">
+          <h2>Metadata</h2>
+          <span className="badge">{parserId ?? "unknown parser"}</span>
+        </div>
+        <div className="fields-grid">
+          <label>
+            Title
+            <input value={title} onChange={(event) => setTitle(event.target.value)} />
+          </label>
+          <label>
+            Author
+            <input value={author} onChange={(event) => setAuthor(event.target.value)} />
+          </label>
+          <label>
+            Language
+            <input value={language} onChange={(event) => setLanguage(event.target.value)} />
+          </label>
+          <label className="full-width">
+            Description
+            <textarea value={description} rows={4} onChange={(event) => setDescription(event.target.value)} />
+          </label>
+          <label className="full-width">
+            Cover image URL (optional)
+            <input
+              type="url"
+              value={coverImageUrl}
+              onChange={(event) => setCoverImageUrl(event.target.value)}
+              placeholder="https://example.com/cover.jpg"
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className={`panel ${hasPreview ? "" : "hidden"}`}>
+        <div className="panel-head">
+          <h2>Chapter Range</h2>
+          <button onClick={onBuild} disabled={isBuildLoading || !hasPreview}>
+            {isBuildLoading ? "Building..." : "Build EPUB"}
+          </button>
+        </div>
+        <div className="fields-grid">
+          <label>
+            Start chapter
+            <select value={startIndex} onChange={(event) => setStartIndex(Number(event.target.value))}>
+              {chapters.map((chapter, index) => (
+                <option key={chapter.id} value={index}>
+                  {chapterLabel(chapter, index)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            End chapter
+            <select value={endIndex} onChange={(event) => setEndIndex(Number(event.target.value))}>
+              {chapters.map((chapter, index) => (
+                <option key={chapter.id} value={index}>
+                  {chapterLabel(chapter, index)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <p className="hint">
+          {hasPreview
+            ? `Selected ${selectedChapters.length} chapters: “${chapters[selectedRange.start]?.title || ""}” to “${chapters[selectedRange.end]?.title || ""}”.`
+            : ""}
+        </p>
+      </section>
+    </main>
+  );
+}

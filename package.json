@@ -7,7 +7,15 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "node apps/api/src/server.js",
+    "dev": "npm run dev:all",
+    "dev:api": "node apps/api/src/server.js",
+    "dev:web": "npm --workspace @scraper-epub/web run dev",
+    "dev:all": "concurrently -n api,web -c blue,magenta \"npm run dev:api\" \"npm run dev:web\"",
+    "build:web": "npm --workspace @scraper-epub/web run build",
+    "build": "npm run build:web",
     "start": "node apps/api/src/server.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
   }
 }

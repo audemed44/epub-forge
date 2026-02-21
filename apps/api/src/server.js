@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildFromSelection, listParsers, previewUrl } from "@scraper-epub/core";
@@ -66,7 +67,9 @@ app.post("/api/build", async (req, res) => {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const webRoot = path.resolve(__dirname, "../../web/public");
+const builtWebRoot = path.resolve(__dirname, "../../web/dist");
+const legacyWebRoot = path.resolve(__dirname, "../../web/public");
+const webRoot = fs.existsSync(builtWebRoot) ? builtWebRoot : legacyWebRoot;
 app.use(express.static(webRoot));
 
 app.get("*", (_req, res) => {

@@ -1,6 +1,6 @@
 # scraper-epub
 
-Self-hosted web app version of WebToEpub flow. Current MVP includes:
+Self-hosted web app version of WebToEpub flow. Current target parsers:
 
 - `royalroad.com`
 - `novelfire.net`
@@ -10,6 +10,18 @@ Self-hosted web app version of WebToEpub flow. Current MVP includes:
 
 ```bash
 npm install
+npm run dev
+```
+
+This starts:
+
+- API server on `http://localhost:3000`
+- React dev server on `http://localhost:5173` (proxies `/api` to `:3000`)
+
+For production-style local run:
+
+```bash
+npm run build
 npm start
 ```
 
