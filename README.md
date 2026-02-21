@@ -36,7 +36,7 @@ Then open `http://localhost:3000`.
 
 ## GHCR auto-publish (GitHub Actions)
 
-This repo includes `REDACTED_PATH/.github/workflows/publish-ghcr.yml` to build and push Docker images to GHCR on:
+This repo includes `.github/workflows/publish-ghcr.yml` to build and push Docker images to GHCR on:
 
 - push to `main`
 - push to `codex/**` branches
