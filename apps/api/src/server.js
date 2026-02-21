@@ -75,6 +75,26 @@ async function ensureStoragePaths() {
   await fsp.mkdir(configDir, { recursive: true });
 }
 
+async function moveFile(sourcePath, destinationPath) {
+  try {
+    await fsp.rename(sourcePath, destinationPath);
+    return;
+  } catch (error) {
+    if (error?.code !== "EXDEV") {
+      throw error;
+    }
+  }
+
+  await fsp.copyFile(sourcePath, destinationPath, fs.constants.COPYFILE_EXCL);
+
+  try {
+    await fsp.unlink(sourcePath);
+  } catch (error) {
+    await fsp.unlink(destinationPath).catch(() => {});
+    throw error;
+  }
+}
+
 function toPublicJob(job, includeLogs = false) {
   const base = {
     id: job.id,
@@ -306,7 +326,7 @@ app.post("/api/build-jobs/:jobId/move-to-bookdrop", async (req, res) => {
 
   try {
     const destPath = await resolveUniqueFilePath(bookdropDir, path.basename(job.resultPath));
-    await fsp.rename(job.resultPath, destPath);
+    await moveFile(job.resultPath, destPath);
     job.resultPath = null;
     job.movedToBookdrop = true;
     job.bookdropPath = destPath;
