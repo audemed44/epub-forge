@@ -13,10 +13,13 @@ export async function createApp() {
   const config = getAppConfig();
   await ensureStoragePaths(config.outputDir, config.bookdropDir, config.configDir);
 
+  const repository = new JobsRepository(config.jobsDbFile, config.legacyJobsFile);
+  await repository.init();
+
   const queue = new BuildQueueService({
     outputDir: config.outputDir,
     bookdropDir: config.bookdropDir,
-    repository: new JobsRepository(config.jobsFile),
+    repository,
   });
   await queue.restore();
   void queue.processQueue().catch((error) => {

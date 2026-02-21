@@ -14,6 +14,7 @@ export type BuildJob = {
   resultPath: string | null;
   movedToBookdrop: boolean;
   bookdropPath: string | null;
+  archived: boolean;
 };
 
 export type PublicJob = {
@@ -30,6 +31,7 @@ export type PublicJob = {
   movedToBookdrop: boolean;
   resultPath: string | null;
   bookdropPath: string | null;
+  archived: boolean;
   logs?: string[];
 };
 

@@ -81,6 +81,8 @@ export function AppShell() {
 
         {activeTab === "queue" && (
           <QueueTab
+            scope={queue.scope}
+            setScope={queue.setScope}
             queueJobs={queue.queueJobs}
             selectedQueueJobId={queue.selectedQueueJobId}
             setSelectedQueueJobId={queue.setSelectedQueueJobId}

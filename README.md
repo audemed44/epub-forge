@@ -43,7 +43,8 @@ The queue now writes completed EPUBs to disk and supports a `Move to Bookdrop` a
 
 - `EPUB_OUTPUT_DIR` (default: `/data/epubs`): built EPUB files
 - `BOOKDROP_DIR` (default: `/data/bookdrop`): destination when you click **Move to Bookdrop**
-- `CONFIG_DIR` (default: `/data/config`): persisted queue/job state (`jobs.json`)
+- `CONFIG_DIR` (default: `/data/config`): persisted queue/job state (`jobs.db`)
+- `JOBS_DB_FILE` (default: `/data/config/jobs.db`): sqlite queue database path
 
 Example service config:
 

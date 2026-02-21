@@ -8,7 +8,8 @@ export type AppConfig = {
   outputDir: string;
   bookdropDir: string;
   configDir: string;
-  jobsFile: string;
+  jobsDbFile: string;
+  legacyJobsFile: string;
   builtWebRoot: string;
   legacyWebRoot: string;
 };
@@ -28,7 +29,8 @@ export function getAppConfig(): AppConfig {
   const outputDir = process.env.EPUB_OUTPUT_DIR || path.join(dataRoot, "epubs");
   const bookdropDir = process.env.BOOKDROP_DIR || path.join(dataRoot, "bookdrop");
   const configDir = process.env.CONFIG_DIR || path.join(dataRoot, "config");
-  const jobsFile = path.join(configDir, "jobs.json");
+  const jobsDbFile = process.env.JOBS_DB_FILE || path.join(configDir, "jobs.db");
+  const legacyJobsFile = path.join(configDir, "jobs.json");
 
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
@@ -41,7 +43,8 @@ export function getAppConfig(): AppConfig {
     outputDir,
     bookdropDir,
     configDir,
-    jobsFile,
+    jobsDbFile,
+    legacyJobsFile,
     builtWebRoot,
     legacyWebRoot,
   };

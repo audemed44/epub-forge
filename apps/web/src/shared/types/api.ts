@@ -44,6 +44,7 @@ export type QueueJob = {
   totalChapters: number;
   movedToBookdrop: boolean;
   bookdropPath: string | null;
+  archived: boolean;
 };
 
 export type QueueListResponse = { jobs: QueueJob[] };
