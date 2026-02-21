@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebToEpub Server</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>WebToEpub Server</h1>
+      <p class="hint">Paste a chapter list URL or story URL, preview chapters, edit metadata, then build EPUB.</p>
+
+      <section class="panel">
+        <label for="urlInput">Story URL</label>
+        <div class="row">
+          <input id="urlInput" type="url" placeholder="https://www.royalroad.com/fiction/..." />
+          <button id="previewBtn">Preview</button>
+        </div>
+        <p id="status" class="status"></p>
+      </section>
+
+      <section id="metaPanel" class="panel hidden">
+        <h2>Metadata</h2>
+        <div class="grid">
+          <label>Title<input id="titleInput" type="text" /></label>
+          <label>Author<input id="authorInput" type="text" /></label>
+          <label>Language<input id="languageInput" type="text" value="en" /></label>
+          <label>Description<textarea id="descriptionInput" rows="3"></textarea></label>
+        </div>
+      </section>
+
+      <section id="chaptersPanel" class="panel hidden">
+        <div class="row between">
+          <h2>Chapters</h2>
+          <div>
+            <button id="selectAllBtn" type="button">Select all</button>
+            <button id="selectNoneBtn" type="button">Select none</button>
+            <button id="buildBtn" type="button">Build EPUB</button>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th></th>
+              <th>Title</th>
+              <th>URL</th>
+            </tr>
+          </thead>
+          <tbody id="chaptersBody"></tbody>
+        </table>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
