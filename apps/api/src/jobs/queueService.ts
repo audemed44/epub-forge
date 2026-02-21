@@ -135,20 +135,24 @@ export class BuildQueueService {
         await this.persist();
 
         try {
-          const built = await buildFromSelection(
-            { url, parserId, metadata, chapterUrls },
-            {
-              onProgress: (progress) => {
-                job.progress = progress;
-              },
-              onLog: (message) => {
-                job.logs.push(`${new Date().toISOString()} ${message}`);
-                if (job.logs.length > 400) {
-                  job.logs.shift();
-                }
-              },
-            }
-          );
+          const buildInput: BuildFromSelectionInput = { url, metadata };
+          if (parserId !== undefined) {
+            buildInput.parserId = parserId;
+          }
+          if (chapterUrls !== undefined) {
+            buildInput.chapterUrls = chapterUrls;
+          }
+          const built = await buildFromSelection(buildInput, {
+            onProgress: (progress) => {
+              job.progress = progress;
+            },
+            onLog: (message) => {
+              job.logs.push(`${new Date().toISOString()} ${message}`);
+              if (job.logs.length > 400) {
+                job.logs.shift();
+              }
+            },
+          });
 
           const filePath = await resolveUniqueFilePath(this.options.outputDir, built.filename);
           await fsp.writeFile(filePath, built.epubBuffer);

@@ -12,7 +12,7 @@ export class JobsRepository {
       const payload = JSON.parse(raw) as Partial<JobFilePayload>;
       return Array.isArray(payload?.jobs) ? payload.jobs : [];
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      if ((error as { code?: string }).code === "ENOENT") {
         return [];
       }
       throw error;

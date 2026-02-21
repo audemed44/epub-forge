@@ -32,7 +32,7 @@ export async function resolveUniqueFilePath(directory: string, preferredFilename
       candidate = path.join(directory, `${baseName} (${counter})${extension}`);
       counter += 1;
     } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
+      const code = (error as { code?: string }).code;
       if (code === "ENOENT") {
         return candidate;
       }
@@ -52,7 +52,7 @@ export async function moveFile(sourcePath: string, destinationPath: string): Pro
     await fsp.rename(sourcePath, destinationPath);
     return;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException)?.code !== "EXDEV") {
+    if ((error as { code?: string })?.code !== "EXDEV") {
       throw error;
     }
   }

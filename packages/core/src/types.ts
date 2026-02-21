@@ -45,7 +45,7 @@ export type BuildFromSelectionInput = {
 };
 
 export type BuildResult = {
-  epubBuffer: Buffer;
+  epubBuffer: Uint8Array;
   filename: string;
   chapterCount: number;
 };
