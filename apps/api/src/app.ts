@@ -41,7 +41,7 @@ export async function createApp() {
   } else {
     const webRoot = fs.existsSync(config.builtWebRoot) ? config.builtWebRoot : config.legacyWebRoot;
     app.use(express.static(webRoot));
-    app.get("*", (_req, res) => {
+    app.get("*", (_req: any, res: any) => {
       res.sendFile(path.join(webRoot, "index.html"));
     });
   }

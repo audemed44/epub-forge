@@ -1,5 +1,5 @@
 import { absoluteUrl, stripHtmlEntities, uniqueBy } from "../utils.js";
-import type { ChapterRef, ParserPreviewLink, StoryMetadata, StoryParser } from "../types.js";
+import type { ChapterContent, ChapterRef, ParserPreviewLink, PreviewResponse, StoryMetadata, StoryParser } from "../types.js";
 
 export class BaseParser implements StoryParser {
   id = "base";
@@ -8,11 +8,11 @@ export class BaseParser implements StoryParser {
     return false;
   }
 
-  async preview(_url: string) {
+  async preview(_url: string): Promise<PreviewResponse> {
     throw new Error("Not implemented");
   }
 
-  async fetchChapter(_chapterUrl: string) {
+  async fetchChapter(_chapterUrl: string): Promise<ChapterContent> {
     throw new Error("Not implemented");
   }
 

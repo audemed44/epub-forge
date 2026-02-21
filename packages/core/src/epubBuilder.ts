@@ -60,16 +60,16 @@ function coverXhtml(title: string, imageHref: string): string {
 
 function normalizeXhtmlFragment(html: string): string {
   const decoded = he.decode(html || "", { isAttributeValue: false, strict: false });
-  const entityEscaped = decoded.replace(/&([a-zA-Z][a-zA-Z0-9]+);/g, (full, name: string) => {
+  const entityEscaped = decoded.replace(/&([a-zA-Z][a-zA-Z0-9]+);/g, (full: string, name: string) => {
     if (SAFE_XML_ENTITIES.has(name)) {
       return full;
     }
     return `&amp;${name};`;
   });
 
-  const htmlDoc = load(`<div id="epub-root">${entityEscaped}</div>`, { decodeEntities: false });
+  const htmlDoc = load(`<div id="epub-root">${entityEscaped}</div>`);
   const fragment = htmlDoc("#epub-root").html() || "";
-  const xmlDoc = load(`<div id="epub-root">${fragment}</div>`, { xmlMode: true, decodeEntities: false });
+  const xmlDoc = load(`<div id="epub-root">${fragment}</div>`, { xmlMode: true });
   const xmlFragment = xmlDoc("#epub-root").html() || "";
   return replaceNamedEntitiesWithNumeric(xmlFragment);
 }
@@ -259,7 +259,7 @@ function createImageCollector(oebps: JSZip): { addImage: (url: string, prefix?: 
     const index = assets.length + 1;
     const href = `images/${prefix}-${String(index).padStart(4, "0")}${ext}`;
     const id = `img-${index}`;
-    const bytes = Buffer.from(await response.arrayBuffer());
+    const bytes = new Uint8Array(await response.arrayBuffer());
 
     oebps.file(href, bytes);
 
@@ -276,7 +276,7 @@ function createImageCollector(oebps: JSZip): { addImage: (url: string, prefix?: 
 }
 
 async function rewriteChapterImages(chapter: ChapterContent, collector: { addImage: (url: string, prefix?: string) => Promise<ImageAsset | null> }) {
-  const doc = load(`<div id="chapter-root">${chapter.contentHtml || ""}</div>`, { decodeEntities: false });
+  const doc = load(`<div id="chapter-root">${chapter.contentHtml || ""}</div>`);
   const images = doc("#chapter-root img").toArray();
 
   for (const node of images) {

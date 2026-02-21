@@ -23,11 +23,11 @@ type BuildRoutePayload = {
 export function createApiRouter(queue: BuildQueueService) {
   const router = Router();
 
-  router.get("/health", (_req, res) => {
+  router.get("/health", (_req: any, res: any) => {
     res.json({ ok: true, parsers: listParsers() });
   });
 
-  router.post("/preview", async (req, res) => {
+  router.post("/preview", async (req: any, res: any) => {
     try {
       const { url, parserId = null } = (req.body || {}) as { url?: string; parserId?: string | null };
       if (!url) {
@@ -41,7 +41,7 @@ export function createApiRouter(queue: BuildQueueService) {
     }
   });
 
-  router.post("/build", async (req, res) => {
+  router.post("/build", async (req: any, res: any) => {
     try {
       const { url, parserId = null, metadata, chapterUrls = [] } = (req.body || {}) as BuildRoutePayload;
       if (!url || !metadata) {
@@ -59,7 +59,7 @@ export function createApiRouter(queue: BuildQueueService) {
     }
   });
 
-  router.post("/build-jobs", async (req, res) => {
+  router.post("/build-jobs", async (req: any, res: any) => {
     try {
       const { url, parserId = null, metadata, chapterUrls = [] } = (req.body || {}) as BuildRoutePayload;
       if (!url || !metadata) {
@@ -72,12 +72,12 @@ export function createApiRouter(queue: BuildQueueService) {
     }
   });
 
-  router.get("/build-jobs", (_req, res) => {
+  router.get("/build-jobs", (_req: any, res: any) => {
     const jobs = queue.list().map((job) => toPublicJob(job));
     return res.json({ jobs });
   });
 
-  router.delete("/build-jobs", async (_req, res) => {
+  router.delete("/build-jobs", async (_req: any, res: any) => {
     try {
       await queue.clearAll();
       return res.json({ ok: true });
@@ -88,7 +88,7 @@ export function createApiRouter(queue: BuildQueueService) {
     }
   });
 
-  router.get("/build-jobs/:jobId", (req, res) => {
+  router.get("/build-jobs/:jobId", (req: any, res: any) => {
     const job = queue.get(req.params.jobId);
     if (!job) {
       return res.status(404).json({ error: "job not found" });
@@ -96,7 +96,7 @@ export function createApiRouter(queue: BuildQueueService) {
     return res.json(toPublicJob(job, true));
   });
 
-  router.get("/build-jobs/:jobId/file", (req, res) => {
+  router.get("/build-jobs/:jobId/file", (req: any, res: any) => {
     const job = queue.get(req.params.jobId);
     if (!job) {
       return res.status(404).json({ error: "job not found" });
@@ -117,7 +117,7 @@ export function createApiRouter(queue: BuildQueueService) {
     }
   });
 
-  router.post("/build-jobs/:jobId/move-to-bookdrop", async (req, res) => {
+  router.post("/build-jobs/:jobId/move-to-bookdrop", async (req: any, res: any) => {
     const job = queue.get(req.params.jobId);
     if (!job) {
       return res.status(404).json({ error: "job not found" });
