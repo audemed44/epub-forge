@@ -28,3 +28,6 @@ jobs:
 
       - name: Check API syntax
         run: node --check apps/api/src/server.js
+
+      - name: Run smoke tests
+        run: npm run test:smoke
