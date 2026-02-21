@@ -8,6 +8,19 @@ import { buildFromSelection, listParsers, previewUrl } from "@scraper-epub/core"
 const app = express();
 const port = process.env.PORT || 3000;
 
+function safeAsciiFilename(filename) {
+  const cleaned = (filename || "book.epub")
+    .replace(/[\r\n"]/g, " ")
+    .replace(/[^\x20-\x7E]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned) {
+    return "book.epub";
+  }
+  return cleaned.toLowerCase().endsWith(".epub") ? cleaned : `${cleaned}.epub`;
+}
+
 app.use(cors());
 app.use(morgan("dev"));
 app.use(express.json({ limit: "1mb" }));
@@ -38,8 +51,13 @@ app.post("/api/build", async (req, res) => {
     }
 
     const built = await buildFromSelection({ url, parserId, metadata, chapterUrls });
+    const asciiFilename = safeAsciiFilename(built.filename);
+    const utf8Filename = encodeURIComponent((built.filename || "book.epub").replace(/[\r\n]/g, " "));
     res.setHeader("Content-Type", "application/epub+zip");
-    res.setHeader("Content-Disposition", `attachment; filename="${built.filename}"`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${asciiFilename}"; filename*=UTF-8''${utf8Filename}`
+    );
     return res.send(built.epubBuffer);
   } catch (error) {
     return res.status(400).json({ error: error.message });
