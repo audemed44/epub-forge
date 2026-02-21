@@ -34,6 +34,27 @@ docker compose up --build
 
 Then open `http://localhost:3000`.
 
+## GHCR auto-publish (GitHub Actions)
+
+This repo includes `REDACTED_PATH/.github/workflows/publish-ghcr.yml` to build and push Docker images to GHCR on:
+
+- push to `main`
+- push to `codex/**` branches
+- `v*` tags
+- manual workflow dispatch
+
+Published image:
+
+- `ghcr.io/audemed44/epub-forge` (owner comes from repository owner)
+
+After your first successful workflow run, deploy on server with:
+
+```bash
+docker login ghcr.io -u audemed44
+docker pull ghcr.io/audemed44/epub-forge:latest
+docker run -d --name epub-forge -p 3000:3000 --restart unless-stopped ghcr.io/audemed44/epub-forge:latest
+```
+
 ## API
 
 - `POST /api/preview`
