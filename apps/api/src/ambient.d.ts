@@ -13,3 +13,4 @@ declare module "node:url";
 declare module "node:crypto";
 declare module "node:fs/promises";
 declare module "he";
+declare module "sqlite3";

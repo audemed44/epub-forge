@@ -15,6 +15,7 @@ export function toPublicJob(job: BuildJob, includeLogs = false): PublicJob {
     movedToBookdrop: !!job.movedToBookdrop,
     resultPath: job.resultPath || null,
     bookdropPath: job.bookdropPath || null,
+    archived: !!job.archived,
   };
 
   if (includeLogs) {

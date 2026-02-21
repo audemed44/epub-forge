@@ -20,7 +20,7 @@ export class BuildQueueService {
   constructor(private readonly options: QueueServiceOptions) {}
 
   async restore(): Promise<void> {
-    const restored = await this.options.repository.load();
+    const restored = await this.options.repository.loadActive();
     for (const item of restored) {
       const job: BuildJob = {
         ...item,
@@ -28,6 +28,7 @@ export class BuildQueueService {
         movedToBookdrop: !!item.movedToBookdrop,
         bookdropPath: item.bookdropPath || null,
         resultPath: item.resultPath || null,
+        archived: !!item.archived,
       };
 
       if (job.status === "running") {
@@ -46,8 +47,16 @@ export class BuildQueueService {
     return [...this.jobs.values()].sort((a, b) => b.createdAt - a.createdAt);
   }
 
+  async listArchived(): Promise<BuildJob[]> {
+    return this.options.repository.loadArchived();
+  }
+
   get(jobId: string): BuildJob | null {
     return this.jobs.get(jobId) || null;
+  }
+
+  async getAny(jobId: string): Promise<BuildJob | null> {
+    return this.jobs.get(jobId) || this.options.repository.getById(jobId);
   }
 
   async enqueue(request: BuildFromSelectionInput): Promise<BuildJob> {
@@ -64,6 +73,7 @@ export class BuildQueueService {
       resultPath: null,
       movedToBookdrop: false,
       bookdropPath: null,
+      archived: false,
     };
 
     this.jobs.set(jobId, job);
@@ -79,11 +89,12 @@ export class BuildQueueService {
       throw new Error("cannot clear queue while a build is running");
     }
 
+    const ids = [...this.jobs.values()].map((job) => job.id);
+    await this.options.repository.archive(ids);
     this.queue.length = 0;
     this.jobs.clear();
     await fsp.rm(this.options.outputDir, { recursive: true, force: true });
     await fsp.mkdir(this.options.outputDir, { recursive: true });
-    await this.persist();
   }
 
   async moveToBookdrop(jobId: string): Promise<{ movedToBookdrop: boolean; bookdropPath: string | null }> {

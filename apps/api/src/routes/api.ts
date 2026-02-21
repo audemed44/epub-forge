@@ -72,8 +72,10 @@ export function createApiRouter(queue: BuildQueueService) {
     }
   });
 
-  router.get("/build-jobs", (_req: any, res: any) => {
-    const jobs = queue.list().map((job) => toPublicJob(job));
+  router.get("/build-jobs", async (req: any, res: any) => {
+    const scope = String(req.query?.scope || "active");
+    const sourceJobs = scope === "archive" ? await queue.listArchived() : queue.list();
+    const jobs = sourceJobs.map((job) => toPublicJob(job));
     return res.json({ jobs });
   });
 
@@ -88,8 +90,8 @@ export function createApiRouter(queue: BuildQueueService) {
     }
   });
 
-  router.get("/build-jobs/:jobId", (req: any, res: any) => {
-    const job = queue.get(req.params.jobId);
+  router.get("/build-jobs/:jobId", async (req: any, res: any) => {
+    const job = await queue.getAny(req.params.jobId);
     if (!job) {
       return res.status(404).json({ error: "job not found" });
     }

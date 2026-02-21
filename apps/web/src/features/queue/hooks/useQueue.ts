@@ -8,7 +8,10 @@ type UseQueueOptions = {
   setStatus: (value: string) => void;
 };
 
+export type QueueScope = "active" | "archive";
+
 export function useQueue({ setStatus }: UseQueueOptions) {
+  const [scope, setScope] = useState<QueueScope>("active");
   const [queueJobs, setQueueJobs] = useState<QueueJob[]>([]);
   const [selectedQueueJobId, setSelectedQueueJobId] = useState<string | null>(null);
   const [selectedQueueJobLogs, setSelectedQueueJobLogs] = useState<string[]>([]);
@@ -19,14 +22,20 @@ export function useQueue({ setStatus }: UseQueueOptions) {
     [queueJobs, selectedQueueJobId]
   );
 
+  useEffect(() => {
+    setSelectedQueueJobId(null);
+    setSelectedQueueJobLogs([]);
+  }, [scope]);
+
   async function loadQueueJobs() {
-    const result = await getJson<unknown>("/api/build-jobs");
+    const result = await getJson<unknown>(`/api/build-jobs?scope=${scope}`);
     if (!result.ok || !isQueueListResponse(result.data)) {
       return;
     }
     setQueueJobs(result.data.jobs);
-    if (!selectedQueueJobId && result.data.jobs.length > 0) {
-      setSelectedQueueJobId(result.data.jobs[0]!.id);
+    const selectedStillExists = selectedQueueJobId && result.data.jobs.some((job) => job.id === selectedQueueJobId);
+    if (!selectedStillExists) {
+      setSelectedQueueJobId(result.data.jobs[0]?.id || null);
     }
   }
 
@@ -55,7 +64,7 @@ export function useQueue({ setStatus }: UseQueueOptions) {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [selectedQueueJobId]);
+  }, [scope, selectedQueueJobId]);
 
   async function onDownloadJob(jobId: string) {
     try {
@@ -121,6 +130,8 @@ export function useQueue({ setStatus }: UseQueueOptions) {
   }
 
   return {
+    scope,
+    setScope,
     queueJobs,
     selectedQueueJobId,
     setSelectedQueueJobId,

@@ -2,6 +2,8 @@ import { basenameFromPath, formatStatus } from "../../shared/utils/format";
 import type { QueueJob } from "../../shared/types/api";
 
 type QueueTabProps = {
+  scope: "active" | "archive";
+  setScope: (value: "active" | "archive") => void;
   queueJobs: QueueJob[];
   selectedQueueJobId: string | null;
   setSelectedQueueJobId: (value: string) => void;
@@ -16,22 +18,30 @@ type QueueTabProps = {
 };
 
 export function QueueTab(props: QueueTabProps) {
+  const archiveMode = props.scope === "archive";
+
   return (
     <section className="panel queue-panel">
       <div className="panel-head">
         <h2>Build Queue</h2>
         <div className="queue-head-actions">
+          <button type="button" className={archiveMode ? "tab-pill" : "tab-pill active"} onClick={() => props.setScope("active")}>
+            Queue
+          </button>
+          <button type="button" className={archiveMode ? "tab-pill active" : "tab-pill"} onClick={() => props.setScope("archive")}>
+            Archive
+          </button>
           <button type="button" onClick={() => void props.loadQueueJobs()}>
             Refresh
           </button>
-          <button type="button" onClick={() => void props.onClearAllQueue()} disabled={props.queueJobs.length === 0}>
+          <button type="button" onClick={() => void props.onClearAllQueue()} disabled={props.queueJobs.length === 0 || archiveMode}>
             Clear All
           </button>
         </div>
       </div>
 
       {props.queueJobs.length === 0 ? (
-        <p className="hint">No build jobs queued yet.</p>
+        <p className="hint">{archiveMode ? "No archived jobs yet." : "No build jobs queued yet."}</p>
       ) : (
         <div className="queue-grid">
           <div className="queue-list">
@@ -66,7 +76,7 @@ export function QueueTab(props: QueueTabProps) {
                   )}
                 />
 
-                {props.selectedQueueJob.status === "done" && props.selectedQueueJob.hasResult && (
+                {!archiveMode && props.selectedQueueJob.status === "done" && props.selectedQueueJob.hasResult && (
                   <div className="queue-actions">
                     <button
                       type="button"
@@ -76,7 +86,7 @@ export function QueueTab(props: QueueTabProps) {
                       title={props.selectedQueueJob.movedToBookdrop ? "Moved to bookdrop" : "Download EPUB"}
                       aria-label={props.selectedQueueJob.movedToBookdrop ? "Moved to bookdrop" : "Download EPUB"}
                     >
-                      <span aria-hidden="true">{props.selectedQueueJob.movedToBookdrop ? "✓" : "↓"}</span>
+                      <span aria-hidden="true">{props.selectedQueueJob.movedToBookdrop ? "Done" : "DL"}</span>
                     </button>
                     <button
                       type="button"
@@ -86,7 +96,7 @@ export function QueueTab(props: QueueTabProps) {
                       title="Move to bookdrop"
                       aria-label="Move to bookdrop"
                     >
-                      <span aria-hidden="true">↪</span>
+                      <span aria-hidden="true">Move</span>
                     </button>
                   </div>
                 )}
