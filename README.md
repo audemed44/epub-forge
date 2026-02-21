@@ -34,6 +34,38 @@ docker compose up --build
 
 Then open `http://localhost:3000`.
 
+### Persistent storage layout
+
+The queue now writes completed EPUBs to disk and supports a `Move to Bookdrop` action.
+
+- Local (non-Docker) default: `./.data` under the project root.
+- Docker default: `/data` (or override via env vars below).
+
+- `EPUB_OUTPUT_DIR` (default: `/data/epubs`): built EPUB files
+- `BOOKDROP_DIR` (default: `/data/bookdrop`): destination when you click **Move to Bookdrop**
+- `CONFIG_DIR` (default: `/data/config`): persisted queue/job state (`jobs.json`)
+
+Example service config:
+
+```yaml
+services:
+  epub-forge:
+    image: ghcr.io/audemed44/epub-forge:latest
+    container_name: epub-forge
+    restart: unless-stopped
+    ports:
+      - "9780:3000"
+    environment:
+      DATA_ROOT: /data
+      EPUB_OUTPUT_DIR: /data/epubs
+      BOOKDROP_DIR: /data/bookdrop
+      CONFIG_DIR: /data/config
+    volumes:
+      - /abc/bookdrop:/data/bookdrop
+      - /abc/epub-forge:/data/epubs
+      - /abc/epub-forge/config:/data/config
+```
+
 ## GHCR auto-publish (GitHub Actions)
 
 This repo includes `.github/workflows/publish-ghcr.yml` to build and push Docker images to GHCR on:
