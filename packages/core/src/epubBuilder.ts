@@ -2,9 +2,18 @@ import JSZip from "jszip";
 import { load } from "cheerio";
 import he from "he";
 import { escapeXml, sanitizeFilename } from "./utils.js";
+import type { ChapterContent, StoryMetadata } from "./types.js";
+
+type ImageAsset = {
+  id: string;
+  href: string;
+  mediaType: string;
+  sourceUrl: string;
+  isCoverImage: boolean;
+};
 
 const SAFE_XML_ENTITIES = new Set(["amp", "lt", "gt", "quot", "apos"]);
-const MIME_TO_EXT = {
+const MIME_TO_EXT: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/png": ".png",
   "image/gif": ".gif",
@@ -13,11 +22,11 @@ const MIME_TO_EXT = {
   "image/avif": ".avif",
 };
 
-function chapterFileName(index) {
+function chapterFileName(index: number): string {
   return `chapter-${String(index + 1).padStart(4, "0")}.xhtml`;
 }
 
-function chapterXhtml(title, html) {
+function chapterXhtml(title: string, html: string): string {
   const normalizedHtml = normalizeXhtmlFragment(html);
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
@@ -34,7 +43,7 @@ function chapterXhtml(title, html) {
 </html>`;
 }
 
-function coverXhtml(title, imageHref) {
+function coverXhtml(title: string, imageHref: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -49,9 +58,9 @@ function coverXhtml(title, imageHref) {
 </html>`;
 }
 
-function normalizeXhtmlFragment(html) {
+function normalizeXhtmlFragment(html: string): string {
   const decoded = he.decode(html || "", { isAttributeValue: false, strict: false });
-  const entityEscaped = decoded.replace(/&([a-zA-Z][a-zA-Z0-9]+);/g, (full, name) => {
+  const entityEscaped = decoded.replace(/&([a-zA-Z][a-zA-Z0-9]+);/g, (full, name: string) => {
     if (SAFE_XML_ENTITIES.has(name)) {
       return full;
     }
@@ -65,8 +74,8 @@ function normalizeXhtmlFragment(html) {
   return replaceNamedEntitiesWithNumeric(xmlFragment);
 }
 
-function replaceNamedEntitiesWithNumeric(html) {
-  return html.replace(/&([a-zA-Z][a-zA-Z0-9]+);/g, (full, name) => {
+function replaceNamedEntitiesWithNumeric(html: string): string {
+  return html.replace(/&([a-zA-Z][a-zA-Z0-9]+);/g, (full, name: string) => {
     if (SAFE_XML_ENTITIES.has(name)) {
       return full;
     }
@@ -78,13 +87,13 @@ function replaceNamedEntitiesWithNumeric(html) {
 
     let numeric = "";
     for (const ch of decoded) {
-      numeric += `&#x${ch.codePointAt(0).toString(16).toUpperCase()};`;
+      numeric += `&#x${ch.codePointAt(0)!.toString(16).toUpperCase()};`;
     }
     return numeric;
   });
 }
 
-function safeAbsoluteUrl(baseUrl, maybeRelativeUrl) {
+function safeAbsoluteUrl(baseUrl: string, maybeRelativeUrl: string): string | null {
   try {
     return new URL(maybeRelativeUrl, baseUrl).toString();
   } catch {
@@ -92,17 +101,17 @@ function safeAbsoluteUrl(baseUrl, maybeRelativeUrl) {
   }
 }
 
-function extensionFromUrl(url) {
+function extensionFromUrl(url: string): string | null {
   try {
     const path = new URL(url).pathname;
     const match = path.match(/\.([a-zA-Z0-9]{2,5})$/);
-    return match ? `.${match[1].toLowerCase()}` : null;
+    return match ? `.${match[1]!.toLowerCase()}` : null;
   } catch {
     return null;
   }
 }
 
-function mediaTypeFromExtension(ext) {
+function mediaTypeFromExtension(ext: string | null): string {
   const value = (ext || "").toLowerCase();
   if (value === ".jpg" || value === ".jpeg") {
     return "image/jpeg";
@@ -125,7 +134,11 @@ function mediaTypeFromExtension(ext) {
   return "application/octet-stream";
 }
 
-function contentOpf(metadata, chapters, options) {
+function contentOpf(
+  metadata: StoryMetadata,
+  chapters: ChapterContent[],
+  options: { imageAssets: ImageAsset[]; coverPageHref: string | null; coverImageId: string | null }
+): string {
   const now = new Date().toISOString();
   const manifestChapters = chapters
     .map((_chapter, idx) => `<item id="chapter-${idx + 1}" href="${chapterFileName(idx)}" media-type="application/xhtml+xml"/>`)
@@ -142,11 +155,9 @@ function contentOpf(metadata, chapters, options) {
     ? `<item id="cover-page" href="${options.coverPageHref}" media-type="application/xhtml+xml"/>`
     : "";
 
-  const spineChapters = chapters
-    .map((_chapter, idx) => `<itemref idref="chapter-${idx + 1}"/>`)
-    .join("\n    ");
+  const spineChapters = chapters.map((_chapter, idx) => `<itemref idref="chapter-${idx + 1}"/>`).join("\n    ");
 
-  const coverPageSpine = options.coverPageHref ? `<itemref idref="cover-page"/>\n    ` : "";
+  const coverPageSpine = options.coverPageHref ? "<itemref idref=\"cover-page\"/>\n    " : "";
   const coverMeta = options.coverImageId ? `<meta name="cover" content="${options.coverImageId}"/>` : "";
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -174,13 +185,15 @@ function contentOpf(metadata, chapters, options) {
 </package>`;
 }
 
-function tocNcx(metadata, chapters) {
+function tocNcx(metadata: StoryMetadata, chapters: ChapterContent[]): string {
   const navPoints = chapters
-    .map((chapter, idx) => `
+    .map(
+      (chapter, idx) => `
     <navPoint id="navPoint-${idx + 1}" playOrder="${idx + 1}">
       <navLabel><text>${escapeXml(chapter.title)}</text></navLabel>
       <content src="${chapterFileName(idx)}"/>
-    </navPoint>`)
+    </navPoint>`
+    )
     .join("");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -194,7 +207,7 @@ function tocNcx(metadata, chapters) {
 </ncx>`;
 }
 
-function navXhtml(chapters) {
+function navXhtml(chapters: ChapterContent[]): string {
   const links = chapters
     .map((chapter, idx) => `<li><a href="${chapterFileName(idx)}">${escapeXml(chapter.title)}</a></li>`)
     .join("\n      ");
@@ -217,30 +230,30 @@ function navXhtml(chapters) {
 </html>`;
 }
 
-function createImageCollector(oebps) {
-  const byUrl = new Map();
-  const assets = [];
+function createImageCollector(oebps: JSZip): { addImage: (url: string, prefix?: string) => Promise<ImageAsset | null>; listAssets: () => ImageAsset[] } {
+  const byUrl = new Map<string, ImageAsset>();
+  const assets: ImageAsset[] = [];
 
-  async function addImage(url, prefix = "image") {
+  async function addImage(url: string, prefix = "image"): Promise<ImageAsset | null> {
     if (!url) {
       return null;
     }
 
     if (byUrl.has(url)) {
-      return byUrl.get(url);
+      return byUrl.get(url)!;
     }
 
     const response = await fetch(url, {
       headers: {
         "user-agent": "Mozilla/5.0 (WebToEpub-Server)",
-        "accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
       },
     });
     if (!response.ok) {
       throw new Error(`Unable to fetch image ${url}: ${response.status}`);
     }
 
-    const contentType = (response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    const contentType = (response.headers.get("content-type") || "").split(";")[0]!.trim().toLowerCase();
     const ext = MIME_TO_EXT[contentType] || extensionFromUrl(url) || ".img";
     const mediaType = MIME_TO_EXT[contentType] ? contentType : mediaTypeFromExtension(ext);
     const index = assets.length + 1;
@@ -250,7 +263,7 @@ function createImageCollector(oebps) {
 
     oebps.file(href, bytes);
 
-    const asset = { id, href, mediaType, sourceUrl: url, isCoverImage: false };
+    const asset: ImageAsset = { id, href, mediaType, sourceUrl: url, isCoverImage: false };
     assets.push(asset);
     byUrl.set(url, asset);
     return asset;
@@ -262,7 +275,7 @@ function createImageCollector(oebps) {
   };
 }
 
-async function rewriteChapterImages(chapter, collector) {
+async function rewriteChapterImages(chapter: ChapterContent, collector: { addImage: (url: string, prefix?: string) => Promise<ImageAsset | null> }) {
   const doc = load(`<div id="chapter-root">${chapter.contentHtml || ""}</div>`, { decodeEntities: false });
   const images = doc("#chapter-root img").toArray();
 
@@ -293,7 +306,7 @@ async function rewriteChapterImages(chapter, collector) {
   return doc("#chapter-root").html() || "";
 }
 
-export async function buildEpub(metadata, chapters) {
+export async function buildEpub(metadata: StoryMetadata, chapters: ChapterContent[]) {
   if (!chapters.length) {
     throw new Error("No chapters selected");
   }
@@ -311,18 +324,21 @@ export async function buildEpub(metadata, chapters) {
   );
 
   const oebps = zip.folder("OEBPS");
+  if (!oebps) {
+    throw new Error("Unable to create EPUB structure");
+  }
   oebps.file("styles.css", "body{font-family:serif;line-height:1.4;}h1{font-size:1.2em;}img{max-width:100%;height:auto}");
 
   const collector = createImageCollector(oebps);
 
   for (let idx = 0; idx < chapters.length; idx += 1) {
-    const chapter = chapters[idx];
+    const chapter = chapters[idx]!;
     const withLocalImages = await rewriteChapterImages(chapter, collector);
     oebps.file(chapterFileName(idx), chapterXhtml(chapter.title, withLocalImages));
   }
 
-  let coverPageHref = null;
-  let coverImageId = null;
+  let coverPageHref: string | null = null;
+  let coverImageId: string | null = null;
   if (metadata.coverImageUrl) {
     const absoluteCoverUrl = safeAbsoluteUrl(metadata.sourceUrl, metadata.coverImageUrl);
     if (absoluteCoverUrl) {

@@ -1,21 +1,22 @@
 import { absoluteUrl, stripHtmlEntities, uniqueBy } from "../utils.js";
+import type { ChapterRef, ParserPreviewLink, StoryMetadata, StoryParser } from "../types.js";
 
-export class BaseParser {
+export class BaseParser implements StoryParser {
   id = "base";
 
-  canHandle(_url) {
+  canHandle(_url: string): boolean {
     return false;
   }
 
-  async preview(_url) {
+  async preview(_url: string) {
     throw new Error("Not implemented");
   }
 
-  async fetchChapter(_chapterUrl) {
+  async fetchChapter(_chapterUrl: string) {
     throw new Error("Not implemented");
   }
 
-  normalizeChapterList(baseUrl, links) {
+  protected normalizeChapterList(baseUrl: string, links: ParserPreviewLink[]): ChapterRef[] {
     const chapters = links
       .map((link, index) => {
         const sourceUrl = absoluteUrl(baseUrl, link.href);
@@ -28,13 +29,21 @@ export class BaseParser {
           title: stripHtmlEntities(link.title || link.text || sourceUrl),
         };
       })
-      .filter(Boolean);
+      .filter((value): value is ChapterRef => value !== null);
 
-    return uniqueBy(chapters, (chapter) => chapter.sourceUrl)
-      .map((chapter, index) => ({ ...chapter, id: `ch-${index + 1}` }));
+    return uniqueBy(chapters, (chapter) => chapter.sourceUrl).map((chapter, index) => ({
+      ...chapter,
+      id: `ch-${index + 1}`,
+    }));
   }
 
-  metadataDefaults(sourceUrl, title, author, description = null, coverImageUrl = null) {
+  protected metadataDefaults(
+    sourceUrl: string,
+    title: string,
+    author: string,
+    description: string | null = null,
+    coverImageUrl: string | null = null
+  ): StoryMetadata {
     return {
       sourceUrl,
       title: stripHtmlEntities(title) || "Untitled",

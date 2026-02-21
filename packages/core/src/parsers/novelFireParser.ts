@@ -2,19 +2,30 @@ import { BaseParser } from "./baseParser.js";
 import { fetchDom, fetchJson } from "../http.js";
 import { stripHtmlEntities } from "../utils.js";
 
-export class NovelFireParser extends BaseParser {
-  id = "novelfire";
+type NovelFireChapterRow = {
+  n_sort: string | number;
+  title: string;
+};
 
-  canHandle(url) {
+type NovelFireAjaxResponse = {
+  data?: NovelFireChapterRow[];
+  recordsTotal?: number;
+  recordsFiltered?: number;
+};
+
+export class NovelFireParser extends BaseParser {
+  override id = "novelfire";
+
+  override canHandle(url: string): boolean {
     const host = new URL(url).hostname.replace(/^www\./, "");
     return host === "novelfire.net";
   }
 
-  storyRoot(url) {
+  private storyRoot(url: string): string {
     return url.endsWith("/chapters") ? url.slice(0, -9) : url.replace(/\/$/, "");
   }
 
-  async preview(url) {
+  override async preview(url: string) {
     const root = this.storyRoot(url);
     const chapterListingUrl = `${root}/chapters`;
     const { $, html } = await fetchDom(chapterListingUrl);
@@ -42,16 +53,16 @@ export class NovelFireParser extends BaseParser {
     };
   }
 
-  async fetchAllAjaxChapters(ajaxEndpoint, root) {
+  private async fetchAllAjaxChapters(ajaxEndpoint: string, root: string) {
     const pageSize = 100;
     let start = 0;
     let hasMore = true;
-    const chapterData = [];
-    const seen = new Set();
+    const chapterData: NovelFireChapterRow[] = [];
+    const seen = new Set<string>();
 
     while (hasMore) {
       const requestUrl = this.buildAjaxPageUrl(ajaxEndpoint, start, pageSize);
-      const payload = await fetchJson(requestUrl);
+      const payload = await fetchJson<NovelFireAjaxResponse>(requestUrl);
       const page = Array.isArray(payload?.data) ? payload.data : [];
 
       if (page.length === 0) {
@@ -82,11 +93,11 @@ export class NovelFireParser extends BaseParser {
     }));
   }
 
-  buildAjaxPageUrl(baseUrl, start, length) {
+  private buildAjaxPageUrl(baseUrl: string, start: number, length: number): string {
     return `${baseUrl}&draw=1&start=${start}&length=${length}&order%5B0%5D%5Bcolumn%5D=2&order%5B0%5D%5Bdir%5D=asc`;
   }
 
-  async fetchAllHtmlChapters(chapterListingUrl, root, firstPageDom) {
+  private async fetchAllHtmlChapters(chapterListingUrl: string, root: string, firstPageDom: any) {
     const chapters = this.extractHtmlChapterPage(firstPageDom, root);
     const pageUrls = this.extractTocPageUrls(firstPageDom, chapterListingUrl);
 
@@ -95,7 +106,7 @@ export class NovelFireParser extends BaseParser {
       chapters.push(...this.extractHtmlChapterPage($, root));
     }
 
-    const unique = new Map();
+    const unique = new Map<string, { id: string; sourceUrl: string; title: string }>();
     for (const chapter of chapters) {
       if (!unique.has(chapter.sourceUrl)) {
         unique.set(chapter.sourceUrl, chapter);
@@ -104,9 +115,9 @@ export class NovelFireParser extends BaseParser {
     return [...unique.values()].map((chapter, idx) => ({ ...chapter, id: `ch-${idx + 1}` }));
   }
 
-  extractHtmlChapterPage($, root) {
-    const links = [];
-    $("ul.chapter-list a").each((_i, el) => {
+  private extractHtmlChapterPage($: any, root: string) {
+    const links: { href: string | undefined; text: string }[] = [];
+    $("ul.chapter-list a").each((_i: number, el: any) => {
       links.push({
         href: $(el).attr("href"),
         text: stripHtmlEntities($(el).find(".chapter-title").text() || $(el).text()),
@@ -115,10 +126,10 @@ export class NovelFireParser extends BaseParser {
     return this.normalizeChapterList(root, links);
   }
 
-  extractTocPageUrls($, chapterListingUrl) {
+  private extractTocPageUrls($: any, chapterListingUrl: string): string[] {
     const pageNumbers = $("ul.pagination li a")
       .toArray()
-      .map((el) => {
+      .map((el: any) => {
         const href = $(el).attr("href");
         if (!href) {
           return null;
@@ -130,7 +141,7 @@ export class NovelFireParser extends BaseParser {
           return null;
         }
       })
-      .filter((page) => typeof page === "number" && page > 1);
+      .filter((page: unknown): page is number => typeof page === "number" && page > 1);
 
     if (pageNumbers.length === 0) {
       return [];
@@ -138,7 +149,7 @@ export class NovelFireParser extends BaseParser {
 
     const maxPage = Math.max(...pageNumbers);
     const base = new URL(chapterListingUrl);
-    const urls = [];
+    const urls: string[] = [];
     for (let page = 2; page <= maxPage; page += 1) {
       base.searchParams.set("page", String(page));
       urls.push(base.toString());
@@ -146,7 +157,7 @@ export class NovelFireParser extends BaseParser {
     return urls;
   }
 
-  extractAjaxEndpoint(html) {
+  private extractAjaxEndpoint(html: string): string | null {
     const marker = "/listChapterDataAjax";
     const index = html.indexOf(marker);
     if (index === -1) {
@@ -164,7 +175,7 @@ export class NovelFireParser extends BaseParser {
     return `https://${hostMatch[1]}${fragment}`;
   }
 
-  async fetchChapter(chapterUrl) {
+  override async fetchChapter(chapterUrl: string) {
     const { $ } = await fetchDom(chapterUrl);
     const title = $("span.chapter-title").first().text().trim() || $("h1").first().text().trim() || "Chapter";
     const content = $("div.chapter-content, div#content").first();
@@ -180,8 +191,8 @@ export class NovelFireParser extends BaseParser {
     };
   }
 
-  removeWatermarkParagraphs($, content) {
-    content.find("p").each((_i, element) => {
+  private removeWatermarkParagraphs($: any, content: any): void {
+    content.find("p").each((_i: number, element: any) => {
       const className = ($(element).attr("class") || "").trim();
       if (className) {
         $(element).remove();
@@ -189,14 +200,14 @@ export class NovelFireParser extends BaseParser {
     });
   }
 
-  removeNestedStrongTags($, content) {
-    content.find("strong strong").each((_i, element) => {
+  private removeNestedStrongTags($: any, content: any): void {
+    content.find("strong strong").each((_i: number, element: any) => {
       $(element).parent().remove();
     });
   }
 
-  removeDlInfoBlocks($, content) {
-    content.find("div > dl > dt").each((_i, element) => {
+  private removeDlInfoBlocks($: any, content: any): void {
+    content.find("div > dl > dt").each((_i: number, element: any) => {
       $(element).parent().parent().remove();
     });
   }

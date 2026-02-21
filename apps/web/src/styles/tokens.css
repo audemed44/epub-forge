@@ -1,0 +1,11 @@
+:root {
+  color-scheme: dark;
+  --ink: #000;
+  --hero-bg: #202a58;
+  --panel-bg: #4f89e8;
+  --text-on-panel: #091121;
+  --muted: #d8dff7;
+  --control-bg: #101318;
+  --control-text: #f4f6fb;
+  --ring: #60a5fa;
+}

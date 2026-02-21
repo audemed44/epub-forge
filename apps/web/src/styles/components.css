@@ -1,0 +1,176 @@
+.nav-item {
+  border: 3px solid #000;
+  border-radius: 8px;
+  box-shadow: 4px 4px 0 #000;
+  background: #5b86e8;
+  color: #071224;
+  font-weight: 900;
+  padding: 0.6rem 0.7rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav-item.active {
+  transform: translate(-1px, -1px);
+  box-shadow: 6px 6px 0 #000;
+  background: #8cb0ff;
+}
+
+.badge {
+  background: #111;
+  color: #fff;
+  border: 3px solid #000;
+  padding: 0.22rem 0.5rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 900;
+  box-shadow: 3px 3px 0 #000;
+}
+
+.status,
+.hint,
+.cover-upload-name {
+  margin: 0.7rem 0 0;
+  font-weight: 700;
+  color: #142240;
+}
+
+.cover-actions {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+.cover-upload-name {
+  margin-top: 0.2rem;
+  font-size: 0.86rem;
+}
+
+.cover-preview {
+  margin-top: 0.4rem;
+  border: 3px solid #000;
+  border-radius: 8px;
+  background: var(--control-bg);
+  box-shadow: 4px 4px 0 #000;
+  padding: 0.6rem;
+}
+
+.cover-preview p {
+  margin: 0 0 0.45rem;
+  font-weight: 900;
+  color: var(--control-text);
+}
+
+.cover-preview img {
+  display: block;
+  width: min(220px, 100%);
+  border: 3px solid #000;
+  border-radius: 6px;
+  box-shadow: 4px 4px 0 #000;
+  background: #222;
+}
+
+.queue-panel .queue-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 0.8rem;
+}
+
+.queue-head-actions {
+  display: flex;
+  gap: 0.55rem;
+}
+
+.queue-list {
+  display: grid;
+  gap: 0.55rem;
+  max-height: 460px;
+  overflow: auto;
+}
+
+.queue-item {
+  text-align: left;
+  display: grid;
+  gap: 0.2rem;
+  background: #2a3f77;
+  color: #e6eeff;
+}
+
+.queue-item strong {
+  font-size: 0.92rem;
+}
+
+.queue-item span {
+  font-size: 0.78rem;
+  opacity: 0.9;
+}
+
+.queue-item.active {
+  background: #6f9bff;
+  color: #061021;
+}
+
+.queue-detail {
+  border: 3px solid #000;
+  border-radius: 8px;
+  box-shadow: 4px 4px 0 #000;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.7rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.queue-detail p {
+  margin: 0;
+  font-weight: 700;
+}
+
+.queue-actions {
+  display: flex;
+  gap: 0.55rem;
+}
+
+.icon-button {
+  min-width: 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.queue-error {
+  color: #7a0014;
+}
+
+.logs-toggle {
+  margin-top: 0.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+}
+
+.logs-toggle input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+.build-logs {
+  margin: 0.1rem 0 0;
+  max-height: 220px;
+  overflow: auto;
+  border: 2px solid #000;
+  border-radius: 6px;
+  background: #0e1422;
+  color: #dbe9ff;
+  padding: 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}

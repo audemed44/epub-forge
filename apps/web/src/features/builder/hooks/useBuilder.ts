@@ -1,0 +1,201 @@
+import { useMemo, useState } from "react";
+import { postJson } from "../../../shared/api/client";
+import { isPreviewResponse } from "../../../shared/api/guards";
+import type { ChapterRef, Metadata } from "../../../shared/types/api";
+
+type UseBuilderOptions = {
+  setStatus: (value: string) => void;
+  onJobQueued: (jobId: string) => void;
+};
+
+export function useBuilder({ setStatus, onJobQueued }: UseBuilderOptions) {
+  const [url, setUrl] = useState("");
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [isEnqueueing, setIsEnqueueing] = useState(false);
+
+  const [parserId, setParserId] = useState<string | null>(null);
+  const [chapters, setChapters] = useState<ChapterRef[]>([]);
+  const [startIndex, setStartIndex] = useState(0);
+  const [endIndex, setEndIndex] = useState(0);
+
+  const [title, setTitle] = useState("");
+  const [author, setAuthor] = useState("");
+  const [language, setLanguage] = useState("en");
+  const [description, setDescription] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [detectedCoverImageUrl, setDetectedCoverImageUrl] = useState("");
+  const [coverUploadName, setCoverUploadName] = useState("");
+
+  const hasPreview = chapters.length > 0;
+
+  const selectedRange = useMemo(() => {
+    const start = Math.max(0, Math.min(startIndex, chapters.length - 1));
+    const end = Math.max(0, Math.min(endIndex, chapters.length - 1));
+    return { start: Math.min(start, end), end: Math.max(start, end) };
+  }, [chapters.length, endIndex, startIndex]);
+
+  const selectedChapters = useMemo(
+    () => chapters.slice(selectedRange.start, selectedRange.end + 1),
+    [chapters, selectedRange.end, selectedRange.start]
+  );
+
+  async function onPreview() {
+    const inputUrl = url.trim();
+    if (!inputUrl) {
+      setStatus("Enter a URL first.");
+      return;
+    }
+
+    setIsPreviewLoading(true);
+    setStatus("Fetching metadata and chapter list...");
+
+    try {
+      const result = await postJson<unknown>("/api/preview", { url: inputUrl });
+      if (!result.ok || !isPreviewResponse(result.data)) {
+        const message =
+          typeof result.data === "object" &&
+          result.data !== null &&
+          "error" in result.data &&
+          typeof (result.data as { error?: unknown }).error === "string"
+            ? (result.data as { error: string }).error
+            : "Preview failed";
+        throw new Error(message);
+      }
+
+      const data = result.data;
+      setParserId(data.parserId);
+      setChapters(data.chapters);
+      setStartIndex(0);
+      setEndIndex(Math.max(data.chapters.length - 1, 0));
+
+      setTitle(data.metadata.title || "");
+      setAuthor(data.metadata.author || "");
+      setLanguage(data.metadata.language || "en");
+      setDescription(data.metadata.description || "");
+      setCoverImageUrl(data.metadata.coverImageUrl || "");
+      setDetectedCoverImageUrl(data.metadata.coverImageUrl || "");
+      setCoverUploadName("");
+      setFileName(data.metadata.title || "");
+
+      setStatus(`Loaded ${data.chapters.length} chapters with parser '${data.parserId}'.`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Preview failed");
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  }
+
+  async function onEnqueueBuild() {
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) {
+      setStatus("Enter a URL first.");
+      return;
+    }
+    if (!parserId) {
+      setStatus("Run preview before building.");
+      return;
+    }
+    if (selectedChapters.length === 0) {
+      setStatus("Pick a valid chapter range.");
+      return;
+    }
+
+    const payload: {
+      url: string;
+      parserId: string;
+      chapterUrls: string[];
+      metadata: Metadata;
+    } = {
+      url: trimmedUrl,
+      parserId,
+      chapterUrls: selectedChapters.map((chapter) => chapter.sourceUrl),
+      metadata: {
+        sourceUrl: trimmedUrl,
+        title: title.trim(),
+        author: author.trim(),
+        language: language.trim() || "en",
+        description: description.trim() || null,
+        coverImageUrl: coverImageUrl.trim() || null,
+        fileName: fileName.trim() || title.trim() || null,
+      },
+    };
+
+    setIsEnqueueing(true);
+    try {
+      const result = await postJson<{ jobId?: string; error?: string }>("/api/build-jobs", payload);
+      if (!result.ok || !result.data.jobId) {
+        throw new Error(result.data.error || "Failed to enqueue build job");
+      }
+
+      onJobQueued(result.data.jobId);
+      setStatus(`Build job queued (${result.data.jobId.slice(0, 8)}).`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Failed to enqueue build");
+    } finally {
+      setIsEnqueueing(false);
+    }
+  }
+
+  async function onCoverUpload(file: File | null) {
+    if (!file) {
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setStatus("Cover upload must be an image file.");
+      return;
+    }
+
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          resolve(reader.result);
+          return;
+        }
+        reject(new Error("Could not read uploaded file."));
+      };
+      reader.onerror = () => reject(new Error("Could not read uploaded file."));
+      reader.readAsDataURL(file);
+    });
+
+    setCoverImageUrl(dataUrl);
+    setCoverUploadName(file.name);
+    setStatus(`Using uploaded cover file: ${file.name}`);
+  }
+
+  return {
+    url,
+    setUrl,
+    isPreviewLoading,
+    isEnqueueing,
+    parserId,
+    chapters,
+    startIndex,
+    setStartIndex,
+    endIndex,
+    setEndIndex,
+    title,
+    setTitle,
+    author,
+    setAuthor,
+    language,
+    setLanguage,
+    description,
+    setDescription,
+    fileName,
+    setFileName,
+    coverImageUrl,
+    setCoverImageUrl,
+    detectedCoverImageUrl,
+    setDetectedCoverImageUrl,
+    coverUploadName,
+    setCoverUploadName,
+    hasPreview,
+    selectedRange,
+    selectedChapters,
+    onPreview,
+    onEnqueueBuild,
+    onCoverUpload,
+  };
+}

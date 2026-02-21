@@ -7,13 +7,15 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "ONE_PORT_DEV=1 node apps/api/src/server.js",
+    "dev": "ONE_PORT_DEV=1 tsx apps/api/src/server.ts",
     "build:web": "npm --workspace @scraper-epub/web run build",
     "build": "npm run build:web",
-    "start": "node apps/api/src/server.js",
+    "start": "tsx apps/api/src/server.ts",
+    "typecheck": "npm --workspace @scraper-epub/core run typecheck && npm --workspace @scraper-epub/api run typecheck && npm --workspace @scraper-epub/web run typecheck",
     "test:smoke": "node scripts/smoke.mjs"
   },
   "devDependencies": {
+    "tsx": "^4.20.5",
     "vite": "^5.4.21"
   }
 }
