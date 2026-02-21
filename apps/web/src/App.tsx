@@ -354,6 +354,28 @@ export function App() {
     }
   }
 
+  async function onClearAllQueue() {
+    const shouldClear = window.confirm("Clear all queue entries and remove generated EPUB files from output storage? (Bookdrop files are not touched.)");
+    if (!shouldClear) {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/build-jobs", { method: "DELETE" });
+      const data = (await response.json()) as { ok?: boolean; error?: string };
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || "Failed to clear queue");
+      }
+
+      setQueueJobs([]);
+      setSelectedQueueJobId(null);
+      setSelectedQueueJobLogs([]);
+      setStatus("Cleared queue and output EPUBs.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Failed to clear queue");
+    }
+  }
+
   async function onCoverUpload(file: File | null) {
     if (!file) {
       return;
@@ -534,7 +556,12 @@ export function App() {
           <section className="panel queue-panel">
             <div className="panel-head">
               <h2>Build Queue</h2>
-              <button type="button" onClick={() => void loadQueueJobs()}>Refresh</button>
+              <div className="queue-head-actions">
+                <button type="button" onClick={() => void loadQueueJobs()}>Refresh</button>
+                <button type="button" onClick={() => void onClearAllQueue()} disabled={queueJobs.length === 0}>
+                  Clear All
+                </button>
+              </div>
             </div>
 
             {queueJobs.length === 0 ? (

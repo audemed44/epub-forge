@@ -70,6 +70,13 @@ async function run() {
     const listPayload = await listResponse.json();
     assert(Array.isArray(listPayload.jobs), 'build-jobs payload missing jobs array');
 
+    const clearResponse = await fetch(`${baseUrl}/api/build-jobs`, {
+      method: 'DELETE',
+    });
+    assert(clearResponse.ok, `clear build-jobs failed with ${clearResponse.status}`);
+    const clearPayload = await clearResponse.json();
+    assert(clearPayload.ok === true, 'clear build-jobs payload missing ok=true');
+
     const badJobResponse = await fetch(`${baseUrl}/api/build-jobs`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

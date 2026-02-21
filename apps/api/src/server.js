@@ -244,6 +244,24 @@ app.get("/api/build-jobs", (_req, res) => {
   return res.json({ jobs });
 });
 
+app.delete("/api/build-jobs", async (_req, res) => {
+  const hasRunningJob = [...buildJobs.values()].some((job) => job.status === "running");
+  if (hasRunningJob) {
+    return res.status(409).json({ error: "cannot clear queue while a build is running" });
+  }
+
+  try {
+    buildQueue.length = 0;
+    buildJobs.clear();
+    await fsp.rm(outputDir, { recursive: true, force: true });
+    await fsp.mkdir(outputDir, { recursive: true });
+    await persistJobs();
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 app.get("/api/build-jobs/:jobId", (req, res) => {
   const job = buildJobs.get(req.params.jobId);
   if (!job) {
