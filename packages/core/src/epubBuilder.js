@@ -1,11 +1,24 @@
 import JSZip from "jszip";
+import { load } from "cheerio";
+import he from "he";
 import { escapeXml, sanitizeFilename } from "./utils.js";
+
+const SAFE_XML_ENTITIES = new Set(["amp", "lt", "gt", "quot", "apos"]);
+const MIME_TO_EXT = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/gif": ".gif",
+  "image/webp": ".webp",
+  "image/svg+xml": ".svg",
+  "image/avif": ".avif",
+};
 
 function chapterFileName(index) {
   return `chapter-${String(index + 1).padStart(4, "0")}.xhtml`;
 }
 
 function chapterXhtml(title, html) {
+  const normalizedHtml = normalizeXhtmlFragment(html);
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -16,20 +29,125 @@ function chapterXhtml(title, html) {
 </head>
 <body>
   <h1>${escapeXml(title)}</h1>
-  ${html}
+  ${normalizedHtml}
 </body>
 </html>`;
 }
 
-function contentOpf(metadata, chapters) {
+function coverXhtml(title, imageHref) {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <title>${escapeXml(title)} - Cover</title>
+  <meta charset="UTF-8" />
+  <style>body{margin:0;padding:0}img{display:block;max-width:100%;height:auto;margin:0 auto}</style>
+</head>
+<body>
+  <img src="${escapeXml(imageHref)}" alt="Cover image" />
+</body>
+</html>`;
+}
+
+function normalizeXhtmlFragment(html) {
+  const decoded = he.decode(html || "", { isAttributeValue: false, strict: false });
+  const entityEscaped = decoded.replace(/&([a-zA-Z][a-zA-Z0-9]+);/g, (full, name) => {
+    if (SAFE_XML_ENTITIES.has(name)) {
+      return full;
+    }
+    return `&amp;${name};`;
+  });
+
+  const htmlDoc = load(`<div id="epub-root">${entityEscaped}</div>`, { decodeEntities: false });
+  const fragment = htmlDoc("#epub-root").html() || "";
+  const xmlDoc = load(`<div id="epub-root">${fragment}</div>`, { xmlMode: true, decodeEntities: false });
+  const xmlFragment = xmlDoc("#epub-root").html() || "";
+  return replaceNamedEntitiesWithNumeric(xmlFragment);
+}
+
+function replaceNamedEntitiesWithNumeric(html) {
+  return html.replace(/&([a-zA-Z][a-zA-Z0-9]+);/g, (full, name) => {
+    if (SAFE_XML_ENTITIES.has(name)) {
+      return full;
+    }
+
+    const decoded = he.decode(full, { strict: false });
+    if (decoded === full) {
+      return `&amp;${name};`;
+    }
+
+    let numeric = "";
+    for (const ch of decoded) {
+      numeric += `&#x${ch.codePointAt(0).toString(16).toUpperCase()};`;
+    }
+    return numeric;
+  });
+}
+
+function safeAbsoluteUrl(baseUrl, maybeRelativeUrl) {
+  try {
+    return new URL(maybeRelativeUrl, baseUrl).toString();
+  } catch {
+    return null;
+  }
+}
+
+function extensionFromUrl(url) {
+  try {
+    const path = new URL(url).pathname;
+    const match = path.match(/\.([a-zA-Z0-9]{2,5})$/);
+    return match ? `.${match[1].toLowerCase()}` : null;
+  } catch {
+    return null;
+  }
+}
+
+function mediaTypeFromExtension(ext) {
+  const value = (ext || "").toLowerCase();
+  if (value === ".jpg" || value === ".jpeg") {
+    return "image/jpeg";
+  }
+  if (value === ".png") {
+    return "image/png";
+  }
+  if (value === ".gif") {
+    return "image/gif";
+  }
+  if (value === ".webp") {
+    return "image/webp";
+  }
+  if (value === ".svg") {
+    return "image/svg+xml";
+  }
+  if (value === ".avif") {
+    return "image/avif";
+  }
+  return "application/octet-stream";
+}
+
+function contentOpf(metadata, chapters, options) {
   const now = new Date().toISOString();
   const manifestChapters = chapters
-    .map((chapter, idx) => `<item id="chapter-${idx + 1}" href="${chapterFileName(idx)}" media-type="application/xhtml+xml"/>`)
+    .map((_chapter, idx) => `<item id="chapter-${idx + 1}" href="${chapterFileName(idx)}" media-type="application/xhtml+xml"/>`)
     .join("\n    ");
+
+  const manifestImages = options.imageAssets
+    .map((asset) => {
+      const properties = asset.isCoverImage ? " properties=\"cover-image\"" : "";
+      return `<item id="${asset.id}" href="${asset.href}" media-type="${asset.mediaType}"${properties}/>`;
+    })
+    .join("\n    ");
+
+  const coverPageManifest = options.coverPageHref
+    ? `<item id="cover-page" href="${options.coverPageHref}" media-type="application/xhtml+xml"/>`
+    : "";
 
   const spineChapters = chapters
     .map((_chapter, idx) => `<itemref idref="chapter-${idx + 1}"/>`)
     .join("\n    ");
+
+  const coverPageSpine = options.coverPageHref ? `<itemref idref="cover-page"/>\n    ` : "";
+  const coverMeta = options.coverImageId ? `<meta name="cover" content="${options.coverImageId}"/>` : "";
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" unique-identifier="bookid" version="3.0">
@@ -39,16 +157,19 @@ function contentOpf(metadata, chapters) {
     <dc:creator>${escapeXml(metadata.author)}</dc:creator>
     <dc:language>${escapeXml(metadata.language || "en")}</dc:language>
     ${metadata.description ? `<dc:description>${escapeXml(metadata.description)}</dc:description>` : ""}
+    ${coverMeta}
     <meta property="dcterms:modified">${now}</meta>
   </metadata>
   <manifest>
     <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
     <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
     <item id="style" href="styles.css" media-type="text/css"/>
+    ${coverPageManifest}
     ${manifestChapters}
+    ${manifestImages}
   </manifest>
   <spine toc="ncx">
-    ${spineChapters}
+    ${coverPageSpine}${spineChapters}
   </spine>
 </package>`;
 }
@@ -96,6 +217,82 @@ function navXhtml(chapters) {
 </html>`;
 }
 
+function createImageCollector(oebps) {
+  const byUrl = new Map();
+  const assets = [];
+
+  async function addImage(url, prefix = "image") {
+    if (!url) {
+      return null;
+    }
+
+    if (byUrl.has(url)) {
+      return byUrl.get(url);
+    }
+
+    const response = await fetch(url, {
+      headers: {
+        "user-agent": "Mozilla/5.0 (WebToEpub-Server)",
+        "accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Unable to fetch image ${url}: ${response.status}`);
+    }
+
+    const contentType = (response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    const ext = MIME_TO_EXT[contentType] || extensionFromUrl(url) || ".img";
+    const mediaType = MIME_TO_EXT[contentType] ? contentType : mediaTypeFromExtension(ext);
+    const index = assets.length + 1;
+    const href = `images/${prefix}-${String(index).padStart(4, "0")}${ext}`;
+    const id = `img-${index}`;
+    const bytes = Buffer.from(await response.arrayBuffer());
+
+    oebps.file(href, bytes);
+
+    const asset = { id, href, mediaType, sourceUrl: url, isCoverImage: false };
+    assets.push(asset);
+    byUrl.set(url, asset);
+    return asset;
+  }
+
+  return {
+    addImage,
+    listAssets: () => assets,
+  };
+}
+
+async function rewriteChapterImages(chapter, collector) {
+  const doc = load(`<div id="chapter-root">${chapter.contentHtml || ""}</div>`, { decodeEntities: false });
+  const images = doc("#chapter-root img").toArray();
+
+  for (const node of images) {
+    const img = doc(node);
+    const src = img.attr("src");
+    if (!src) {
+      continue;
+    }
+
+    const absolute = safeAbsoluteUrl(chapter.sourceUrl, src);
+    if (!absolute || absolute.startsWith("data:")) {
+      continue;
+    }
+
+    try {
+      const asset = await collector.addImage(absolute, "image");
+      if (asset) {
+        img.attr("src", asset.href);
+        img.removeAttr("srcset");
+        img.removeAttr("loading");
+      }
+    } catch {
+      // Keep original image URL if fetch fails.
+    }
+  }
+
+  return doc("#chapter-root").html() || "";
+}
+
 export async function buildEpub(metadata, chapters) {
   if (!chapters.length) {
     throw new Error("No chapters selected");
@@ -114,13 +311,37 @@ export async function buildEpub(metadata, chapters) {
   );
 
   const oebps = zip.folder("OEBPS");
-  oebps.file("styles.css", "body{font-family:serif;line-height:1.4;}h1{font-size:1.2em;}");
+  oebps.file("styles.css", "body{font-family:serif;line-height:1.4;}h1{font-size:1.2em;}img{max-width:100%;height:auto}");
 
-  chapters.forEach((chapter, idx) => {
-    oebps.file(chapterFileName(idx), chapterXhtml(chapter.title, chapter.contentHtml));
-  });
+  const collector = createImageCollector(oebps);
 
-  oebps.file("content.opf", contentOpf(metadata, chapters));
+  for (let idx = 0; idx < chapters.length; idx += 1) {
+    const chapter = chapters[idx];
+    const withLocalImages = await rewriteChapterImages(chapter, collector);
+    oebps.file(chapterFileName(idx), chapterXhtml(chapter.title, withLocalImages));
+  }
+
+  let coverPageHref = null;
+  let coverImageId = null;
+  if (metadata.coverImageUrl) {
+    const absoluteCoverUrl = safeAbsoluteUrl(metadata.sourceUrl, metadata.coverImageUrl);
+    if (absoluteCoverUrl) {
+      try {
+        const coverAsset = await collector.addImage(absoluteCoverUrl, "cover");
+        if (coverAsset) {
+          coverAsset.isCoverImage = true;
+          coverPageHref = "cover.xhtml";
+          coverImageId = coverAsset.id;
+          oebps.file(coverPageHref, coverXhtml(metadata.title || "Book", coverAsset.href));
+        }
+      } catch {
+        // Proceed without embedded cover if fetch fails.
+      }
+    }
+  }
+
+  const imageAssets = collector.listAssets();
+  oebps.file("content.opf", contentOpf(metadata, chapters, { imageAssets, coverPageHref, coverImageId }));
   oebps.file("toc.ncx", tocNcx(metadata, chapters));
   oebps.file("nav.xhtml", navXhtml(chapters));
 
