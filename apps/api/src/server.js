@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import morgan from "morgan";
 import fs from "node:fs";
+import fsp from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -9,6 +10,23 @@ import { buildFromSelection, listParsers, previewUrl } from "@scraper-epub/core"
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+function resolveDataRoot() {
+  if (process.env.DATA_ROOT) {
+    return process.env.DATA_ROOT;
+  }
+  if (fs.existsSync("/.dockerenv")) {
+    return "/data";
+  }
+  return path.join(process.cwd(), ".data");
+}
+
+const dataRoot = resolveDataRoot();
+const outputDir = process.env.EPUB_OUTPUT_DIR || path.join(dataRoot, "epubs");
+const bookdropDir = process.env.BOOKDROP_DIR || path.join(dataRoot, "bookdrop");
+const configDir = process.env.CONFIG_DIR || path.join(dataRoot, "config");
+const jobsFile = path.join(configDir, "jobs.json");
+
 const buildJobs = new Map();
 const buildQueue = [];
 let buildWorkerRunning = false;
@@ -16,6 +34,7 @@ let buildWorkerRunning = false;
 function safeAsciiFilename(filename) {
   const cleaned = (filename || "book.epub")
     .replace(/[\r\n"]/g, " ")
+    .replace(/[\/\\:*?<>|]/g, "-")
     .replace(/[^\x20-\x7E]/g, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -23,12 +42,123 @@ function safeAsciiFilename(filename) {
   if (!cleaned) {
     return "book.epub";
   }
-  return cleaned.toLowerCase().endsWith(".epub") ? cleaned : `${cleaned}.epub`;
+
+  const withExtension = cleaned.toLowerCase().endsWith(".epub") ? cleaned : `${cleaned}.epub`;
+  return withExtension.replace(/^\.+/, "").replace(/\.+$/, "") || "book.epub";
+}
+
+async function resolveUniqueFilePath(directory, preferredFilename) {
+  const safeName = safeAsciiFilename(preferredFilename);
+  const parsed = path.parse(safeName);
+  const baseName = parsed.name || "book";
+  const extension = parsed.ext || ".epub";
+
+  let candidate = path.join(directory, `${baseName}${extension}`);
+  let counter = 2;
+  while (true) {
+    try {
+      await fsp.access(candidate);
+      candidate = path.join(directory, `${baseName} (${counter})${extension}`);
+      counter += 1;
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        return candidate;
+      }
+      throw error;
+    }
+  }
+}
+
+async function ensureStoragePaths() {
+  await fsp.mkdir(outputDir, { recursive: true });
+  await fsp.mkdir(bookdropDir, { recursive: true });
+  await fsp.mkdir(configDir, { recursive: true });
+}
+
+function toPublicJob(job, includeLogs = false) {
+  const base = {
+    id: job.id,
+    status: job.status,
+    progress: job.progress,
+    error: job.error,
+    createdAt: job.createdAt,
+    finishedAt: job.finishedAt,
+    hasResult: !!job.resultPath,
+    title: job.request?.metadata?.title || null,
+    fileName: job.request?.metadata?.fileName || null,
+    totalChapters: job.request?.chapterUrls?.length || 0,
+    movedToBookdrop: !!job.movedToBookdrop,
+    resultPath: job.resultPath || null,
+    bookdropPath: job.bookdropPath || null,
+  };
+
+  if (includeLogs) {
+    return { ...base, logs: job.logs };
+  }
+  return base;
+}
+
+async function persistJobs() {
+  const payload = {
+    jobs: [...buildJobs.values()].map((job) => ({
+      id: job.id,
+      status: job.status,
+      progress: job.progress,
+      logs: job.logs,
+      request: job.request,
+      createdAt: job.createdAt,
+      finishedAt: job.finishedAt,
+      error: job.error,
+      resultPath: job.resultPath,
+      movedToBookdrop: !!job.movedToBookdrop,
+      bookdropPath: job.bookdropPath || null,
+    })),
+  };
+
+  await fsp.writeFile(jobsFile, JSON.stringify(payload, null, 2), "utf8");
+}
+
+async function restoreJobs() {
+  try {
+    const raw = await fsp.readFile(jobsFile, "utf8");
+    const payload = JSON.parse(raw);
+    const jobs = Array.isArray(payload?.jobs) ? payload.jobs : [];
+    for (const item of jobs) {
+      const job = {
+        id: item.id,
+        status: item.status,
+        progress: item.progress,
+        logs: Array.isArray(item.logs) ? item.logs : [],
+        request: item.request,
+        createdAt: item.createdAt,
+        finishedAt: item.finishedAt,
+        error: item.error,
+        resultPath: item.resultPath || null,
+        movedToBookdrop: !!item.movedToBookdrop,
+        bookdropPath: item.bookdropPath || null,
+      };
+
+      if (job.status === "running") {
+        // Crash-safe behavior: restart running jobs from queue.
+        job.status = "queued";
+        job.logs.push(`${new Date().toISOString()} Server restarted; re-queued job`);
+      }
+
+      buildJobs.set(job.id, job);
+      if (job.status === "queued") {
+        buildQueue.push(job.id);
+      }
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") {
+      throw error;
+    }
+  }
 }
 
 app.use(cors());
 app.use(morgan("dev"));
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "4mb" }));
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, parsers: listParsers() });
@@ -59,10 +189,7 @@ app.post("/api/build", async (req, res) => {
     const asciiFilename = safeAsciiFilename(built.filename);
     const utf8Filename = encodeURIComponent((built.filename || "book.epub").replace(/[\r\n]/g, " "));
     res.setHeader("Content-Type", "application/epub+zip");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${asciiFilename}"; filename*=UTF-8''${utf8Filename}`
-    );
+    res.setHeader("Content-Disposition", `attachment; filename="${asciiFilename}"; filename*=UTF-8''${utf8Filename}`);
     return res.send(built.epubBuffer);
   } catch (error) {
     return res.status(400).json({ error: error.message });
@@ -91,10 +218,14 @@ app.post("/api/build-jobs", async (req, res) => {
       createdAt: Date.now(),
       finishedAt: null,
       error: null,
-      result: null,
+      resultPath: null,
+      movedToBookdrop: false,
+      bookdropPath: null,
     };
+
     buildJobs.set(jobId, job);
     buildQueue.push(jobId);
+    await persistJobs();
     processBuildQueue().catch((error) => {
       // eslint-disable-next-line no-console
       console.error(error);
@@ -109,18 +240,7 @@ app.post("/api/build-jobs", async (req, res) => {
 app.get("/api/build-jobs", (_req, res) => {
   const jobs = [...buildJobs.values()]
     .sort((a, b) => b.createdAt - a.createdAt)
-    .map((job) => ({
-      id: job.id,
-      status: job.status,
-      progress: job.progress,
-      error: job.error,
-      createdAt: job.createdAt,
-      finishedAt: job.finishedAt,
-      hasResult: !!job.result,
-      title: job.request?.metadata?.title || null,
-      fileName: job.request?.metadata?.fileName || null,
-      totalChapters: job.request?.chapterUrls?.length || 0,
-    }));
+    .map((job) => toPublicJob(job));
   return res.json({ jobs });
 });
 
@@ -130,35 +250,54 @@ app.get("/api/build-jobs/:jobId", (req, res) => {
     return res.status(404).json({ error: "job not found" });
   }
 
-  return res.json({
-    id: job.id,
-    status: job.status,
-    progress: job.progress,
-    logs: job.logs,
-    error: job.error,
-    createdAt: job.createdAt,
-    finishedAt: job.finishedAt,
-    hasResult: !!job.result,
-    title: job.request?.metadata?.title || null,
-    fileName: job.request?.metadata?.fileName || null,
-    totalChapters: job.request?.chapterUrls?.length || 0,
-  });
+  return res.json(toPublicJob(job, true));
 });
 
-app.get("/api/build-jobs/:jobId/file", (req, res) => {
+app.get("/api/build-jobs/:jobId/file", async (req, res) => {
   const job = buildJobs.get(req.params.jobId);
   if (!job) {
     return res.status(404).json({ error: "job not found" });
   }
-  if (job.status !== "done" || !job.result) {
+  if (job.status !== "done" || !job.resultPath) {
     return res.status(409).json({ error: "job not complete" });
   }
 
-  const asciiFilename = safeAsciiFilename(job.result.filename);
-  const utf8Filename = encodeURIComponent((job.result.filename || "book.epub").replace(/[\r\n]/g, " "));
-  res.setHeader("Content-Type", "application/epub+zip");
-  res.setHeader("Content-Disposition", `attachment; filename="${asciiFilename}"; filename*=UTF-8''${utf8Filename}`);
-  return res.send(job.result.epubBuffer);
+  try {
+    const filename = path.basename(job.resultPath);
+    const asciiFilename = safeAsciiFilename(filename);
+    const utf8Filename = encodeURIComponent(filename.replace(/[\r\n]/g, " "));
+    res.setHeader("Content-Type", "application/epub+zip");
+    res.setHeader("Content-Disposition", `attachment; filename="${asciiFilename}"; filename*=UTF-8''${utf8Filename}`);
+    return res.sendFile(job.resultPath);
+  } catch {
+    return res.status(404).json({ error: "file not found" });
+  }
+});
+
+app.post("/api/build-jobs/:jobId/move-to-bookdrop", async (req, res) => {
+  const job = buildJobs.get(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({ error: "job not found" });
+  }
+  if (job.status !== "done" || !job.resultPath) {
+    return res.status(409).json({ error: "job not complete" });
+  }
+  if (job.movedToBookdrop) {
+    return res.json({ ok: true, movedToBookdrop: true, bookdropPath: job.bookdropPath });
+  }
+
+  try {
+    const destPath = await resolveUniqueFilePath(bookdropDir, path.basename(job.resultPath));
+    await fsp.rename(job.resultPath, destPath);
+    job.resultPath = null;
+    job.movedToBookdrop = true;
+    job.bookdropPath = destPath;
+    job.logs.push(`${new Date().toISOString()} Moved to bookdrop: ${destPath}`);
+    await persistJobs();
+    return res.json({ ok: true, movedToBookdrop: true, bookdropPath: destPath });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
 });
 
 async function processBuildQueue() {
@@ -178,6 +317,7 @@ async function processBuildQueue() {
       const { url, parserId, metadata, chapterUrls } = job.request;
       job.status = "running";
       job.logs.push(`${new Date().toISOString()} Job started`);
+      await persistJobs();
 
       try {
         const built = await buildFromSelection(
@@ -194,15 +334,21 @@ async function processBuildQueue() {
             },
           }
         );
+
+        const filePath = await resolveUniqueFilePath(outputDir, built.filename);
+        await fsp.writeFile(filePath, built.epubBuffer);
+
         job.status = "done";
-        job.result = built;
+        job.resultPath = filePath;
         job.finishedAt = Date.now();
         job.logs.push(`${new Date().toISOString()} Job finished`);
+        await persistJobs();
       } catch (error) {
         job.status = "error";
         job.error = error.message;
         job.finishedAt = Date.now();
         job.logs.push(`${new Date().toISOString()} Job failed: ${error.message}`);
+        await persistJobs();
       }
     }
   } finally {
@@ -216,6 +362,13 @@ const builtWebRoot = path.resolve(__dirname, "../../web/dist");
 const legacyWebRoot = path.resolve(__dirname, "../../web/public");
 
 async function start() {
+  await ensureStoragePaths();
+  await restoreJobs();
+  processBuildQueue().catch((error) => {
+    // eslint-disable-next-line no-console
+    console.error(error);
+  });
+
   if (process.env.ONE_PORT_DEV === "1") {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({

@@ -44,6 +44,8 @@ type QueueJob = {
   title: string | null;
   fileName: string | null;
   totalChapters: number;
+  movedToBookdrop: boolean;
+  bookdropPath: string | null;
 };
 
 type QueueListResponse = { jobs: QueueJob[] };
@@ -96,6 +98,10 @@ function sanitizeFilenameFromHeader(disposition: string | null): string {
 
 function chapterLabel(chapter: ChapterRef, index: number): string {
   return `${String(index + 1).padStart(4, "0")} - ${chapter.title}`;
+}
+
+function basenameFromPath(input: string): string {
+  return input.split(/[\\/]/).pop() || input;
 }
 
 function formatStatus(job: QueueJob): string {
@@ -324,6 +330,30 @@ export function App() {
     }
   }
 
+  async function onMoveToBookdrop(jobId: string) {
+    try {
+      const response = await fetch(`/api/build-jobs/${jobId}/move-to-bookdrop`, {
+        method: "POST",
+      });
+      const data = (await response.json()) as { ok?: boolean; error?: string };
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || "Move to bookdrop failed");
+      }
+
+      setStatus("Moved EPUB to bookdrop.");
+      await loadQueueJobs();
+      if (selectedQueueJobId === jobId) {
+        const detailResponse = await fetch(`/api/build-jobs/${jobId}`);
+        const detailData = (await detailResponse.json()) as unknown;
+        if (detailResponse.ok && isBuildJobStatus(detailData)) {
+          setSelectedQueueJobLogs(detailData.logs);
+        }
+      }
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Move to bookdrop failed");
+    }
+  }
+
   async function onCoverUpload(file: File | null) {
     if (!file) {
       return;
@@ -541,10 +571,33 @@ export function App() {
                       />
 
                       {selectedQueueJob.status === "done" && selectedQueueJob.hasResult && (
-                        <button type="button" onClick={() => void onDownloadJob(selectedQueueJob.id)}>
-                          Download EPUB
-                        </button>
+                        <div className="queue-actions">
+                          <button
+                            type="button"
+                            className="icon-button"
+                            onClick={() => void onDownloadJob(selectedQueueJob.id)}
+                            disabled={selectedQueueJob.movedToBookdrop}
+                            title={selectedQueueJob.movedToBookdrop ? "Moved to bookdrop" : "Download EPUB"}
+                            aria-label={selectedQueueJob.movedToBookdrop ? "Moved to bookdrop" : "Download EPUB"}
+                          >
+                            <span aria-hidden="true">{selectedQueueJob.movedToBookdrop ? "✓" : "↓"}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="icon-button"
+                            onClick={() => void onMoveToBookdrop(selectedQueueJob.id)}
+                            disabled={selectedQueueJob.movedToBookdrop}
+                            title="Move to bookdrop"
+                            aria-label="Move to bookdrop"
+                          >
+                            <span aria-hidden="true">↪</span>
+                          </button>
+                        </div>
                       )}
+
+                      {selectedQueueJob.movedToBookdrop ? (
+                        <p className="hint">Moved to: {selectedQueueJob.bookdropPath ? basenameFromPath(selectedQueueJob.bookdropPath) : "bookdrop"}</p>
+                      ) : null}
 
                       {selectedQueueJob.error ? <p className="queue-error">{selectedQueueJob.error}</p> : null}
 

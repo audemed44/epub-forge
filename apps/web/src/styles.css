@@ -312,6 +312,23 @@ h2 {
   font-weight: 700;
 }
 
+.queue-actions {
+  display: flex;
+  gap: 0.55rem;
+}
+
+.icon-button {
+  min-width: 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
 .queue-error {
   color: #7a0014;
 }
@@ -357,6 +374,10 @@ h2 {
 
   .queue-panel .queue-grid {
     grid-template-columns: 1fr;
+  }
+
+  .queue-actions {
+    justify-content: flex-start;
   }
 }
 
