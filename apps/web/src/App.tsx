@@ -7,6 +7,7 @@ type Metadata = {
   language: string;
   description: string | null;
   coverImageUrl: string | null;
+  fileName: string | null;
 };
 
 type ChapterRef = {
@@ -27,6 +28,32 @@ type PreviewResponse = {
   };
   chapters: ChapterRef[];
 };
+
+type BuildJobStatus = {
+  id: string;
+  status: "queued" | "running" | "done" | "error";
+  progress: {
+    stage: string;
+    completed: number;
+    total: number;
+  };
+  logs: string[];
+  error: string | null;
+  hasResult: boolean;
+};
+
+function isBuildJobStatus(value: unknown): value is BuildJobStatus {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.id === "string" &&
+    typeof record.status === "string" &&
+    typeof record.progress === "object" &&
+    Array.isArray(record.logs)
+  );
+}
 
 function isPreviewResponse(value: unknown): value is PreviewResponse {
   if (!value || typeof value !== "object") {
@@ -58,6 +85,10 @@ function chapterLabel(chapter: ChapterRef, index: number): string {
   return `${String(index + 1).padStart(4, "0")} - ${chapter.title}`;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export function App() {
   const [url, setUrl] = useState("");
   const [status, setStatus] = useState("Paste a URL and preview chapters.");
@@ -73,9 +104,15 @@ export function App() {
   const [author, setAuthor] = useState("");
   const [language, setLanguage] = useState("en");
   const [description, setDescription] = useState("");
+  const [fileName, setFileName] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [detectedCoverImageUrl, setDetectedCoverImageUrl] = useState("");
   const [coverUploadName, setCoverUploadName] = useState("");
+
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [jobProgress, setJobProgress] = useState({ stage: "idle", completed: 0, total: 0 });
+  const [jobLogs, setJobLogs] = useState<string[]>([]);
+  const [showLogs, setShowLogs] = useState(false);
 
   const hasPreview = chapters.length > 0;
 
@@ -131,6 +168,7 @@ export function App() {
       setCoverImageUrl(data.metadata.coverImageUrl || "");
       setDetectedCoverImageUrl(data.metadata.coverImageUrl || "");
       setCoverUploadName("");
+      setFileName(data.metadata.title || "");
 
       setStatus(`Loaded ${data.chapters.length} chapters with parser '${data.parserId}'.`);
     } catch (error) {
@@ -171,36 +209,77 @@ export function App() {
         language: language.trim() || "en",
         description: description.trim() || null,
         coverImageUrl: coverImageUrl.trim() || null,
+        fileName: fileName.trim() || title.trim() || null,
       },
     };
 
     setIsBuildLoading(true);
-    setStatus("Building EPUB...");
+    setActiveJobId(null);
+    setJobLogs([]);
+    setJobProgress({ stage: "queued", completed: 0, total: selectedChapters.length });
+    setStatus("Starting build job...");
 
     try {
-      const response = await fetch("/api/build", {
+      const startResponse = await fetch("/api/build-jobs", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
-
-      if (!response.ok) {
-        const data = (await response.json()) as { error?: string };
-        throw new Error(data.error || "Build failed");
+      const startData = (await startResponse.json()) as { jobId?: string; error?: string };
+      if (!startResponse.ok || !startData.jobId) {
+        throw new Error(startData.error || "Unable to start build job");
       }
 
-      const blob = await response.blob();
-      const filename = sanitizeFilenameFromHeader(response.headers.get("content-disposition"));
-      const downloadUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = downloadUrl;
-      anchor.download = filename;
-      document.body.append(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(downloadUrl);
+      const jobId = startData.jobId;
+      setActiveJobId(jobId);
+      setStatus("Build started...");
 
-      setStatus(`Downloaded ${filename} (${selectedChapters.length} chapters).`);
+      while (true) {
+        const jobResponse = await fetch(`/api/build-jobs/${jobId}`);
+        const jobData = (await jobResponse.json()) as unknown;
+        if (!jobResponse.ok || !isBuildJobStatus(jobData)) {
+          const message =
+            typeof jobData === "object" &&
+            jobData !== null &&
+            "error" in jobData &&
+            typeof (jobData as { error?: unknown }).error === "string"
+              ? (jobData as { error: string }).error
+              : "Could not fetch build status";
+          throw new Error(message);
+        }
+
+        setJobProgress(jobData.progress);
+        setJobLogs(jobData.logs);
+
+        if (jobData.status === "done") {
+          const fileResponse = await fetch(`/api/build-jobs/${jobId}/file`);
+          if (!fileResponse.ok) {
+            const err = (await fileResponse.json()) as { error?: string };
+            throw new Error(err.error || "Failed to download built EPUB");
+          }
+
+          const blob = await fileResponse.blob();
+          const filename = sanitizeFilenameFromHeader(fileResponse.headers.get("content-disposition"));
+          const downloadUrl = URL.createObjectURL(blob);
+          const anchor = document.createElement("a");
+          anchor.href = downloadUrl;
+          anchor.download = filename;
+          document.body.append(anchor);
+          anchor.click();
+          anchor.remove();
+          URL.revokeObjectURL(downloadUrl);
+
+          setStatus(`Downloaded ${filename} (${selectedChapters.length} chapters).`);
+          break;
+        }
+
+        if (jobData.status === "error") {
+          throw new Error(jobData.error || "Build failed");
+        }
+
+        setStatus(`Building... ${jobData.progress.completed}/${jobData.progress.total}`);
+        await sleep(700);
+      }
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Build failed");
     } finally {
@@ -255,7 +334,7 @@ export function App() {
             type="url"
             value={url}
             onChange={(event) => setUrl(event.target.value)}
-            placeholder="https://novelfire.net/book/a-regressors-tale-of-cultivation"
+            placeholder="https://www.royalroad.com/fiction/151470/re-knight-litrpg-regression"
           />
           <button onClick={onPreview} disabled={isPreviewLoading}>
             {isPreviewLoading ? "Loading..." : "Preview"}
@@ -273,6 +352,10 @@ export function App() {
           <label>
             Title
             <input value={title} onChange={(event) => setTitle(event.target.value)} />
+          </label>
+          <label>
+            Final EPUB file name
+            <input value={fileName} onChange={(event) => setFileName(event.target.value)} placeholder="Book name" />
           </label>
           <label>
             Author
@@ -366,6 +449,21 @@ export function App() {
             ? `Selected ${selectedChapters.length} chapters: “${chapters[selectedRange.start]?.title || ""}” to “${chapters[selectedRange.end]?.title || ""}”.`
             : ""}
         </p>
+
+        {(isBuildLoading || activeJobId) && (
+          <div className="build-progress full-width">
+            <p>
+              Progress: {jobProgress.completed}/{jobProgress.total || selectedChapters.length} ({jobProgress.stage})
+            </p>
+            <progress max={Math.max(jobProgress.total, 1)} value={Math.min(jobProgress.completed, Math.max(jobProgress.total, 1))} />
+            <label className="logs-toggle">
+              <input type="checkbox" checked={showLogs} onChange={(event) => setShowLogs(event.target.checked)} /> Show logs
+            </label>
+            {showLogs && (
+              <pre className="build-logs">{jobLogs.length ? jobLogs.join("\n") : "No logs yet..."}</pre>
+            )}
+          </div>
+        )}
       </section>
     </main>
   );
