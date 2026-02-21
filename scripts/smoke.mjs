@@ -32,7 +32,7 @@ function assert(condition, message) {
 }
 
 async function run() {
-  const server = spawn('node', ['apps/api/src/server.js'], {
+  const server = spawn(process.execPath, ['--import', 'tsx', 'apps/api/src/server.ts'], {
     cwd: process.cwd(),
     env: {
       ...process.env,
