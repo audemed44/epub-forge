@@ -3,22 +3,22 @@ import { fetchDom } from "../http.js";
 import { stripHtmlEntities } from "../utils.js";
 
 export class WordpressGenericParser extends BaseParser {
-  id = "wordpress-generic";
+  override id = "wordpress-generic";
 
-  canHandle(url) {
+  override canHandle(url: string): boolean {
     const host = new URL(url).hostname.toLowerCase();
     return host.includes("wordpress") || host.endsWith(".blog");
   }
 
-  contentSelector() {
+  private contentSelector(): string {
     return "div.entry-content, div.post-content, ul.wp-block-post-template, .wp-block-cover__inner-container";
   }
 
-  titleSelector() {
+  private titleSelector(): string {
     return ".entry-title, .page-title, header.post-title h1, .post-title, #chapter-heading, .wp-block-post-title, h1";
   }
 
-  async preview(url) {
+  override async preview(url: string) {
     const { $ } = await fetchDom(url);
     const title = $(this.titleSelector()).first().text().trim() || $("title").text().trim();
     const author = $("[rel='author'], .author a, .byline a").first().text().trim() || "Unknown";
@@ -30,8 +30,8 @@ export class WordpressGenericParser extends BaseParser {
       throw new Error("Could not detect a supported WordPress chapter page");
     }
     const baseHost = new URL(url).hostname;
-    const links = [];
-    content.find("a[href]").each((_i, el) => {
+    const links: { href: string; text: string }[] = [];
+    content.find("a[href]").each((_i: number, el: any) => {
       const href = $(el).attr("href");
       const text = stripHtmlEntities($(el).text());
       if (!href || !text) {
@@ -60,7 +60,7 @@ export class WordpressGenericParser extends BaseParser {
     };
   }
 
-  async fetchChapter(chapterUrl) {
+  override async fetchChapter(chapterUrl: string) {
     const { $ } = await fetchDom(chapterUrl);
     const title = $(this.titleSelector()).first().text().trim() || $("title").text().trim() || "Chapter";
     const content = $(this.contentSelector()).first();
@@ -69,10 +69,13 @@ export class WordpressGenericParser extends BaseParser {
     }
     content.find("script, style, nav, .sharedaddy, .jp-relatedposts").remove();
     content.find("a[rel='next'], a[rel='prev']").remove();
-    content.find("a").filter((_i, element) => {
-      const text = ($(element).text() || "").toLowerCase();
-      return text.includes("next chapter") || text.includes("previous chapter");
-    }).remove();
+    content
+      .find("a")
+      .filter((_i: number, element: any) => {
+        const text = ($(element).text() || "").toLowerCase();
+        return text.includes("next chapter") || text.includes("previous chapter");
+      })
+      .remove();
 
     return {
       sourceUrl: chapterUrl,

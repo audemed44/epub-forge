@@ -1,13 +1,16 @@
-export function absoluteUrl(base, href) {
+export function absoluteUrl(base: string, href: string | undefined): string | null {
   try {
+    if (!href) {
+      return null;
+    }
     return new URL(href, base).toString();
   } catch {
     return null;
   }
 }
 
-export function uniqueBy(items, selector) {
-  const seen = new Set();
+export function uniqueBy<T, K>(items: T[], selector: (item: T) => K): T[] {
+  const seen = new Set<K>();
   return items.filter((item) => {
     const key = selector(item);
     if (seen.has(key)) {
@@ -18,7 +21,7 @@ export function uniqueBy(items, selector) {
   });
 }
 
-export function sanitizeFilename(name) {
+export function sanitizeFilename(name: string | null | undefined): string {
   const safe = (name || "book")
     .replace(/[\\/:*?"<>|]/g, " ")
     .replace(/\s+/g, " ")
@@ -26,11 +29,11 @@ export function sanitizeFilename(name) {
   return safe.length ? safe : "book";
 }
 
-export function stripHtmlEntities(text) {
+export function stripHtmlEntities(text: string | null | undefined): string {
   return (text || "").replace(/\s+/g, " ").trim();
 }
 
-export function escapeXml(value) {
+export function escapeXml(value: string | null | undefined): string {
   return (value || "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

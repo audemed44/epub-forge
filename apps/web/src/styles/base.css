@@ -1,0 +1,84 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: #eef2ff;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    #202a58;
+  background-size: 64px 64px, 64px 64px, auto;
+  font-family: "Space Grotesk", "Alegreya Sans", "Trebuchet MS", sans-serif;
+}
+
+h1 {
+  margin: 0.2rem 0 0.45rem;
+  font-size: clamp(1.55rem, 5vw, 2.25rem);
+  line-height: 1.03;
+  font-weight: 900;
+  color: #f8fbff;
+}
+
+h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 900;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+input,
+textarea,
+select,
+button,
+progress {
+  width: 100%;
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  font: inherit;
+  font-weight: 700;
+  background: var(--control-bg);
+  color: var(--control-text);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+progress {
+  appearance: none;
+  padding: 0;
+  height: 18px;
+}
+
+input::placeholder {
+  color: #b9c2da;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring), 4px 4px 0 var(--ink);
+}
+
+button {
+  cursor: pointer;
+  font-weight: 900;
+}
+
+button:hover {
+  transform: translate(-1px, -1px);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}

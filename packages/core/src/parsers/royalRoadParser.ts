@@ -1,16 +1,17 @@
+import type { CheerioAPI } from "cheerio";
 import { BaseParser } from "./baseParser.js";
 import { fetchDom } from "../http.js";
-import { absoluteUrl, stripHtmlEntities } from "../utils.js";
+import { stripHtmlEntities } from "../utils.js";
 
 export class RoyalRoadParser extends BaseParser {
-  id = "royalroad";
+  override id = "royalroad";
 
-  canHandle(url) {
+  override canHandle(url: string): boolean {
     const host = new URL(url).hostname.replace(/^www\./, "");
     return host === "royalroad.com" || host === "royalroadl.com";
   }
 
-  storyUrl(url) {
+  private storyUrl(url: string): string {
     const parsed = new URL(url);
     const parts = parsed.pathname.split("/").filter(Boolean);
     const fictionIndex = parts.indexOf("fiction");
@@ -20,7 +21,7 @@ export class RoyalRoadParser extends BaseParser {
     return url.replace(/\/$/, "");
   }
 
-  async preview(url) {
+  override async preview(url: string) {
     const sourceUrl = this.storyUrl(url);
     const { $ } = await fetchDom(sourceUrl);
 
@@ -29,9 +30,8 @@ export class RoyalRoadParser extends BaseParser {
     const description = $("div.fiction-info div.description").first().text().trim() || null;
     const coverImageUrl = $("img.thumbnail").first().attr("src") || null;
 
-    const tocUrl = sourceUrl;
-    const toc = await fetchDom(tocUrl);
-    const links = [];
+    const toc = await fetchDom(sourceUrl);
+    const links: { href: string | undefined; text: string }[] = [];
     toc.$("table#chapters a[href*='/chapter/']").each((_i, el) => {
       links.push({
         href: toc.$(el).attr("href"),
@@ -47,7 +47,7 @@ export class RoyalRoadParser extends BaseParser {
     };
   }
 
-  async fetchChapter(chapterUrl) {
+  override async fetchChapter(chapterUrl: string) {
     const { $ } = await fetchDom(chapterUrl);
     const title = $("h1").first().text().trim() || $("h2").first().text().trim() || "Chapter";
 
@@ -56,10 +56,13 @@ export class RoyalRoadParser extends BaseParser {
     const content = container.length ? container : $(".page-content-wrapper").first();
 
     content.find("script, style, nav, .btn, .chapter-nav").remove();
-    content.find("a[href*='royalroadl.com'], a[href*='royalroad.com']").filter((_i, el) => {
-      const txt = ($(el).text() || "").toLowerCase();
-      return txt.includes("next") || txt.includes("previous");
-    }).remove();
+    content
+      .find("a[href*='royalroadl.com'], a[href*='royalroad.com']")
+      .filter((_i, el) => {
+        const txt = ($(el).text() || "").toLowerCase();
+        return txt.includes("next") || txt.includes("previous");
+      })
+      .remove();
     this.removeAdvertisementBlocks($, content);
     this.keepOnlyWantedTopLevelElements($, content);
     this.removeProblematicInlineStyles($, content);
@@ -71,8 +74,8 @@ export class RoyalRoadParser extends BaseParser {
     };
   }
 
-  removeProblematicInlineStyles($, content) {
-    content.find("[style]").each((_i, element) => {
+  private removeProblematicInlineStyles($: CheerioAPI, content: any): void {
+    content.find("[style]").each((_i: number, element: any) => {
       const styleValue = ($(element).attr("style") || "")
         .replace(/border(-left|-right|-inline-start|-inline-end)?\s*:[^;]+;?/gi, "")
         .replace(/outline\s*:[^;]+;?/gi, "")
@@ -88,42 +91,42 @@ export class RoyalRoadParser extends BaseParser {
     });
   }
 
-  removeAdvertisementBlocks($, content) {
-    const isAdPortlet = (_i, element) => {
+  private removeAdvertisementBlocks($: CheerioAPI, content: any): void {
+    const isAdPortlet = (_i: number, element: any): boolean => {
       const el = $(element);
       const text = el.text().trim().toLowerCase();
       if (text === "advertisement" || text.startsWith("advertisement")) {
         return true;
       }
-      if (el.find("[id^='Chapter_'], [id^='chapter_']").length > 0) {
-        return true;
-      }
-      return false;
+      return el.find("[id^='Chapter_'], [id^='chapter_']").length > 0;
     };
 
-    content.find("div.portlet").filter(isAdPortlet).each((_i, element) => {
-      const el = $(element);
-      const prev = el.prev();
-      if (prev.is("hr")) {
-        prev.remove();
-      }
-      const next = el.next();
-      if (next.is("hr")) {
-        next.remove();
-      }
-      el.remove();
-    });
+    content
+      .find("div.portlet")
+      .filter(isAdPortlet)
+      .each((_i: number, element: any) => {
+        const el = $(element);
+        const prev = el.prev();
+        if (prev.is("hr")) {
+          prev.remove();
+        }
+        const next = el.next();
+        if (next.is("hr")) {
+          next.remove();
+        }
+        el.remove();
+      });
   }
 
-  preprocessRawDom($) {
-    $("img").each((_i, element) => {
+  private preprocessRawDom($: CheerioAPI): void {
+    $("img").each((_i: number, element: any) => {
       const src = ($(element).attr("src") || "").trim();
       if (!src) {
         $(element).remove();
       }
     });
 
-    $("p").each((_i, element) => {
+    $("p").each((_i: number, element: any) => {
       const classes = ($(element).attr("class") || "").split(/\s+/).filter(Boolean);
       const kept = classes.filter((name) => !/^cn[A-Z][A-Za-z0-9]{41}$/.test(name));
       if (kept.length === 0) {
@@ -134,15 +137,15 @@ export class RoyalRoadParser extends BaseParser {
     });
   }
 
-  keepOnlyWantedTopLevelElements($, content) {
-    content.children().each((_i, element) => {
+  private keepOnlyWantedTopLevelElements($: CheerioAPI, content: any): void {
+    content.children().each((_i: number, element: any) => {
       if (!this.isWantedElement($, element)) {
         $(element).remove();
       }
     });
   }
 
-  isWantedElement($, element) {
+  private isWantedElement($: CheerioAPI, element: any): boolean {
     const tag = element.tagName?.toLowerCase() || "";
     const className = ($(element).attr("class") || "").trim();
     return (
