@@ -10,7 +10,8 @@
     "dev": "ONE_PORT_DEV=1 node apps/api/src/server.js",
     "build:web": "npm --workspace @scraper-epub/web run build",
     "build": "npm run build:web",
-    "start": "node apps/api/src/server.js"
+    "start": "node apps/api/src/server.js",
+    "test:smoke": "node scripts/smoke.mjs"
   },
   "devDependencies": {
     "vite": "^5.4.21"
