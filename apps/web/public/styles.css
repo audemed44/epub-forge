@@ -1,11 +1,14 @@
 :root {
-  color-scheme: light;
-  --bg: #f4f1ea;
-  --ink: #1f2421;
-  --muted: #5f665f;
-  --panel: #fffef9;
-  --accent: #275d38;
-  --line: #d5d0c2;
+  color-scheme: dark;
+  --bg: #0b1118;
+  --bg-accent: #101b28;
+  --ink: #e8eef5;
+  --muted: #9aacbf;
+  --panel: #121b27;
+  --accent: #2fbf71;
+  --accent-ink: #08110d;
+  --line: #24384f;
+  --input: #0f1723;
 }
 
 * { box-sizing: border-box; }
@@ -13,7 +16,7 @@
 body {
   margin: 0;
   font-family: "Source Serif 4", Georgia, serif;
-  background: radial-gradient(circle at top right, #ebe6d6 0, var(--bg) 45%);
+  background: radial-gradient(circle at top right, #16263a 0, var(--bg) 48%);
   color: var(--ink);
 }
 
@@ -25,16 +28,18 @@ body {
 
 h1, h2 {
   font-family: "Alegreya", Georgia, serif;
+  margin-top: 0;
 }
 
 .hint { color: var(--muted); }
 
 .panel {
-  background: var(--panel);
+  background: linear-gradient(180deg, #152132 0%, var(--panel) 100%);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 1rem;
   margin-bottom: 1rem;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2);
 }
 
 .hidden { display: none; }
@@ -59,46 +64,49 @@ label {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
+  color: var(--muted);
 }
 
-input, textarea, button {
+input, textarea, select, button {
   font: inherit;
   border-radius: 8px;
   border: 1px solid var(--line);
   padding: 0.55rem 0.65rem;
 }
 
+input, textarea, select {
+  background: var(--input);
+  color: var(--ink);
+}
+
+input::placeholder {
+  color: #7d8fa3;
+}
+
 button {
   background: var(--accent);
-  color: white;
+  color: var(--accent-ink);
   border-color: transparent;
+  font-weight: 600;
   cursor: pointer;
 }
 
 button:hover { opacity: 0.92; }
+button:disabled { opacity: 0.6; cursor: not-allowed; }
 
 #urlInput { flex: 1; }
 
 .status { min-height: 1.2rem; color: var(--muted); }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
+a {
+  color: #89c9ff;
 }
 
-th, td {
-  border-bottom: 1px solid var(--line);
-  padding: 0.5rem;
-  text-align: left;
-  vertical-align: top;
+a:hover {
+  color: #a6d7ff;
 }
-
-th:first-child, td:first-child { width: 40px; }
 
 @media (max-width: 720px) {
   .grid { grid-template-columns: 1fr; }
   .row.between { flex-direction: column; align-items: flex-start; }
-  table {
-    font-size: 0.92rem;
-  }
 }
