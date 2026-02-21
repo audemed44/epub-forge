@@ -270,6 +270,7 @@ export function App() {
       parserId: string;
       chapterUrls: string[];
       metadata: Metadata;
+      forceDuplicate?: boolean;
     } = {
       url: trimmedUrl,
       parserId,
@@ -287,6 +288,20 @@ export function App() {
 
     setIsEnqueueing(true);
     try {
+      const requestedFileName = payload.metadata.fileName || "";
+      if (requestedFileName) {
+        const duplicateResponse = await fetch(`/api/build-jobs/name-exists?fileName=${encodeURIComponent(requestedFileName)}`);
+        const duplicateData = (await duplicateResponse.json()) as { exists?: boolean };
+        if (duplicateResponse.ok && duplicateData.exists) {
+          const shouldProceed = window.confirm("A queued build with that file name already exists. Are you sure you want to continue?");
+          if (!shouldProceed) {
+            setStatus("Build cancelled due to duplicate file name.");
+            return;
+          }
+          payload.forceDuplicate = true;
+        }
+      }
+
       const response = await fetch("/api/build-jobs", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -298,7 +313,6 @@ export function App() {
       }
 
       setSelectedQueueJobId(data.jobId);
-      setActiveTab("queue");
       setStatus(`Build job queued (${data.jobId.slice(0, 8)}).`);
       await loadQueueJobs();
     } catch (error) {

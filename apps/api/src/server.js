@@ -6,6 +6,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { DatabaseSync } from "node:sqlite";
 import { buildFromSelection, listParsers, previewUrl } from "@scraper-epub/core";
 
 const app = express();
@@ -26,10 +27,12 @@ const outputDir = process.env.EPUB_OUTPUT_DIR || path.join(dataRoot, "epubs");
 const bookdropDir = process.env.BOOKDROP_DIR || path.join(dataRoot, "bookdrop");
 const configDir = process.env.CONFIG_DIR || path.join(dataRoot, "config");
 const jobsFile = path.join(configDir, "jobs.json");
+const jobsDbPath = path.join(configDir, "jobs.sqlite");
 
 const buildJobs = new Map();
 const buildQueue = [];
 let buildWorkerRunning = false;
+let jobsDb;
 
 function safeAsciiFilename(filename) {
   const cleaned = (filename || "book.epub")
@@ -45,6 +48,46 @@ function safeAsciiFilename(filename) {
 
   const withExtension = cleaned.toLowerCase().endsWith(".epub") ? cleaned : `${cleaned}.epub`;
   return withExtension.replace(/^\.+/, "").replace(/\.+$/, "") || "book.epub";
+}
+
+function normalizeRequestedFilename(filename) {
+  if (typeof filename !== "string") {
+    return null;
+  }
+  const trimmed = filename.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return safeAsciiFilename(trimmed).toLowerCase();
+}
+
+function hasDuplicateFilename(filename) {
+  const normalized = normalizeRequestedFilename(filename);
+  if (!normalized) {
+    return false;
+  }
+
+  const duplicateInMemory = [...buildJobs.values()].some((job) => {
+    const jobFilename = normalizeRequestedFilename(job.request?.metadata?.fileName);
+    return jobFilename === normalized;
+  });
+  if (duplicateInMemory) {
+    return true;
+  }
+
+  const row = jobsDb
+    .prepare(
+      `
+        SELECT id
+        FROM jobs
+        WHERE cleared != 1
+          AND lower(json_extract(request_json, '$.metadata.fileName')) = ?
+        LIMIT 1
+      `
+    )
+    .get(normalized);
+
+  return !!row;
 }
 
 async function resolveUniqueFilePath(directory, preferredFilename) {
@@ -73,6 +116,43 @@ async function ensureStoragePaths() {
   await fsp.mkdir(outputDir, { recursive: true });
   await fsp.mkdir(bookdropDir, { recursive: true });
   await fsp.mkdir(configDir, { recursive: true });
+}
+
+function openJobsDb() {
+  jobsDb = new DatabaseSync(jobsDbPath);
+  jobsDb.exec(`
+    CREATE TABLE IF NOT EXISTS jobs (
+      id TEXT PRIMARY KEY,
+      status TEXT NOT NULL,
+      progress_json TEXT NOT NULL,
+      logs_json TEXT NOT NULL,
+      request_json TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      finished_at INTEGER,
+      error TEXT,
+      result_path TEXT,
+      moved_to_bookdrop INTEGER NOT NULL DEFAULT 0,
+      bookdrop_path TEXT,
+      cleared INTEGER NOT NULL DEFAULT 0
+    );
+  `);
+}
+
+function rowToJob(row) {
+  return {
+    id: row.id,
+    status: row.status,
+    progress: JSON.parse(row.progress_json),
+    logs: JSON.parse(row.logs_json),
+    request: JSON.parse(row.request_json),
+    createdAt: row.created_at,
+    finishedAt: row.finished_at,
+    error: row.error,
+    resultPath: row.result_path || null,
+    movedToBookdrop: !!row.moved_to_bookdrop,
+    bookdropPath: row.bookdrop_path || null,
+    cleared: !!row.cleared,
+  };
 }
 
 async function moveFile(sourcePath, destinationPath) {
@@ -119,59 +199,108 @@ function toPublicJob(job, includeLogs = false) {
 }
 
 async function persistJobs() {
-  const payload = {
-    jobs: [...buildJobs.values()].map((job) => ({
-      id: job.id,
-      status: job.status,
-      progress: job.progress,
-      logs: job.logs,
-      request: job.request,
-      createdAt: job.createdAt,
-      finishedAt: job.finishedAt,
-      error: job.error,
-      resultPath: job.resultPath,
-      movedToBookdrop: !!job.movedToBookdrop,
-      bookdropPath: job.bookdropPath || null,
-    })),
-  };
+  const statement = jobsDb.prepare(`
+    INSERT INTO jobs (
+      id,
+      status,
+      progress_json,
+      logs_json,
+      request_json,
+      created_at,
+      finished_at,
+      error,
+      result_path,
+      moved_to_bookdrop,
+      bookdrop_path,
+      cleared
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      status = excluded.status,
+      progress_json = excluded.progress_json,
+      logs_json = excluded.logs_json,
+      request_json = excluded.request_json,
+      created_at = excluded.created_at,
+      finished_at = excluded.finished_at,
+      error = excluded.error,
+      result_path = excluded.result_path,
+      moved_to_bookdrop = excluded.moved_to_bookdrop,
+      bookdrop_path = excluded.bookdrop_path,
+      cleared = excluded.cleared
+  `);
 
-  await fsp.writeFile(jobsFile, JSON.stringify(payload, null, 2), "utf8");
+  for (const job of buildJobs.values()) {
+    statement.run(
+      job.id,
+      job.status,
+      JSON.stringify(job.progress),
+      JSON.stringify(job.logs),
+      JSON.stringify(job.request),
+      job.createdAt,
+      job.finishedAt,
+      job.error,
+      job.resultPath,
+      job.movedToBookdrop ? 1 : 0,
+      job.bookdropPath,
+      job.cleared ? 1 : 0
+    );
+  }
+}
+
+function importLegacyJobsFromJson() {
+  if (!fs.existsSync(jobsFile)) {
+    return;
+  }
+
+  const rowCount = jobsDb.prepare("SELECT COUNT(*) AS count FROM jobs").get().count;
+  if (rowCount > 0) {
+    return;
+  }
+
+  const raw = fs.readFileSync(jobsFile, "utf8");
+  const payload = JSON.parse(raw);
+  const jobs = Array.isArray(payload?.jobs) ? payload.jobs : [];
+  for (const item of jobs) {
+    const job = {
+      id: item.id,
+      status: item.status,
+      progress: item.progress,
+      logs: Array.isArray(item.logs) ? item.logs : [],
+      request: item.request,
+      createdAt: item.createdAt,
+      finishedAt: item.finishedAt,
+      error: item.error,
+      resultPath: item.resultPath || null,
+      movedToBookdrop: !!item.movedToBookdrop,
+      bookdropPath: item.bookdropPath || null,
+      cleared: false,
+    };
+
+    buildJobs.set(job.id, job);
+  }
 }
 
 async function restoreJobs() {
-  try {
-    const raw = await fsp.readFile(jobsFile, "utf8");
-    const payload = JSON.parse(raw);
-    const jobs = Array.isArray(payload?.jobs) ? payload.jobs : [];
-    for (const item of jobs) {
-      const job = {
-        id: item.id,
-        status: item.status,
-        progress: item.progress,
-        logs: Array.isArray(item.logs) ? item.logs : [],
-        request: item.request,
-        createdAt: item.createdAt,
-        finishedAt: item.finishedAt,
-        error: item.error,
-        resultPath: item.resultPath || null,
-        movedToBookdrop: !!item.movedToBookdrop,
-        bookdropPath: item.bookdropPath || null,
-      };
+  importLegacyJobsFromJson();
 
-      if (job.status === "running") {
-        // Crash-safe behavior: restart running jobs from queue.
-        job.status = "queued";
-        job.logs.push(`${new Date().toISOString()} Server restarted; re-queued job`);
-      }
+  if (buildJobs.size > 0) {
+    await persistJobs();
+    buildJobs.clear();
+  }
 
-      buildJobs.set(job.id, job);
-      if (job.status === "queued") {
-        buildQueue.push(job.id);
-      }
+  const rows = jobsDb.prepare("SELECT * FROM jobs WHERE cleared != 1 ORDER BY created_at ASC").all();
+  for (const row of rows) {
+    const job = rowToJob(row);
+
+    if (job.status === "running") {
+      // Crash-safe behavior: restart running jobs from queue.
+      job.status = "queued";
+      job.logs.push(`${new Date().toISOString()} Server restarted; re-queued job`);
     }
-  } catch (error) {
-    if (error.code !== "ENOENT") {
-      throw error;
+
+    buildJobs.set(job.id, job);
+    if (job.status === "queued") {
+      buildQueue.push(job.id);
     }
   }
 }
@@ -218,10 +347,15 @@ app.post("/api/build", async (req, res) => {
 
 app.post("/api/build-jobs", async (req, res) => {
   try {
-    const { url, parserId = null, metadata, chapterUrls = [] } = req.body || {};
+    const { url, parserId = null, metadata, chapterUrls = [], forceDuplicate = false } = req.body || {};
     if (!url || !metadata) {
       return res.status(400).json({ error: "url and metadata are required" });
     }
+
+    if (!forceDuplicate && hasDuplicateFilename(metadata.fileName)) {
+      return res.status(409).json({ error: "A build with that file name already exists.", duplicateFilename: true });
+    }
+
 
     const jobId = randomUUID();
     const job = {
@@ -241,6 +375,7 @@ app.post("/api/build-jobs", async (req, res) => {
       resultPath: null,
       movedToBookdrop: false,
       bookdropPath: null,
+      cleared: false,
     };
 
     buildJobs.set(jobId, job);
@@ -264,6 +399,12 @@ app.get("/api/build-jobs", (_req, res) => {
   return res.json({ jobs });
 });
 
+app.get("/api/build-jobs/name-exists", (req, res) => {
+  const filename = typeof req.query.fileName === "string" ? req.query.fileName : "";
+  return res.json({ exists: hasDuplicateFilename(filename) });
+});
+
+
 app.delete("/api/build-jobs", async (_req, res) => {
   const hasRunningJob = [...buildJobs.values()].some((job) => job.status === "running");
   if (hasRunningJob) {
@@ -272,6 +413,8 @@ app.delete("/api/build-jobs", async (_req, res) => {
 
   try {
     buildQueue.length = 0;
+    const setCleared = jobsDb.prepare("UPDATE jobs SET cleared = 1 WHERE cleared != 1");
+    setCleared.run();
     buildJobs.clear();
     await fsp.rm(outputDir, { recursive: true, force: true });
     await fsp.mkdir(outputDir, { recursive: true });
@@ -401,6 +544,7 @@ const legacyWebRoot = path.resolve(__dirname, "../../web/public");
 
 async function start() {
   await ensureStoragePaths();
+  openJobsDb();
   await restoreJobs();
   processBuildQueue().catch((error) => {
     // eslint-disable-next-line no-console
