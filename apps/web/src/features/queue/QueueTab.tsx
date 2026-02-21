@@ -1,4 +1,6 @@
 import { basenameFromPath, formatStatus } from "../../shared/utils/format";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faBookBookmark, faDownload } from "@fortawesome/free-solid-svg-icons";
 import type { QueueJob } from "../../shared/types/api";
 
 type QueueTabProps = {
@@ -86,7 +88,7 @@ export function QueueTab(props: QueueTabProps) {
                       title={props.selectedQueueJob.movedToBookdrop ? "Moved to bookdrop" : "Download EPUB"}
                       aria-label={props.selectedQueueJob.movedToBookdrop ? "Moved to bookdrop" : "Download EPUB"}
                     >
-                      <span aria-hidden="true">{props.selectedQueueJob.movedToBookdrop ? "Done" : "DL"}</span>
+                      <FontAwesomeIcon icon={faDownload} aria-hidden="true" />
                     </button>
                     <button
                       type="button"
@@ -96,7 +98,7 @@ export function QueueTab(props: QueueTabProps) {
                       title="Move to bookdrop"
                       aria-label="Move to bookdrop"
                     >
-                      <span aria-hidden="true">Move</span>
+                      <FontAwesomeIcon icon={faBookBookmark} aria-hidden="true" />
                     </button>
                   </div>
                 )}
