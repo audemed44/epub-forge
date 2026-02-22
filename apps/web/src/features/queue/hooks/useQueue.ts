@@ -1,16 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { deleteJson, getJson, postJson } from "../../../shared/api/client";
 import { isBuildJobStatus, isQueueListResponse } from "../../../shared/api/guards";
 import { sanitizeFilenameFromHeader } from "../../../shared/utils/format";
 import type { QueueJob } from "../../../shared/types/api";
 
-type UseQueueOptions = {
-  setStatus: (value: string) => void;
-};
+type UseQueueOptions = {};
 
 export type QueueScope = "active" | "archive";
 
-export function useQueue({ setStatus }: UseQueueOptions) {
+export function useQueue({}: UseQueueOptions) {
   const [scope, setScope] = useState<QueueScope>("active");
   const [queueJobs, setQueueJobs] = useState<QueueJob[]>([]);
   const [selectedQueueJobId, setSelectedQueueJobId] = useState<string | null>(null);
@@ -83,8 +82,9 @@ export function useQueue({ setStatus }: UseQueueOptions) {
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(downloadUrl);
+      toast.success(`Downloaded ${filename}`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Download failed");
+      toast.error(error instanceof Error ? error.message : "Download failed");
     }
   }
 
@@ -95,7 +95,7 @@ export function useQueue({ setStatus }: UseQueueOptions) {
         throw new Error(result.data.error || "Move to bookdrop failed");
       }
 
-      setStatus("Moved EPUB to bookdrop.");
+      toast.success("Moved EPUB to bookdrop.");
       await loadQueueJobs();
       if (selectedQueueJobId === jobId) {
         const detailResult = await getJson<unknown>(`/api/build-jobs/${jobId}`);
@@ -104,16 +104,11 @@ export function useQueue({ setStatus }: UseQueueOptions) {
         }
       }
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Move to bookdrop failed");
+      toast.error(error instanceof Error ? error.message : "Move to bookdrop failed");
     }
   }
 
   async function onClearAllQueue() {
-    const shouldClear = window.confirm("Clear all queue entries and remove generated EPUB files from output storage? (Bookdrop files are not touched.)");
-    if (!shouldClear) {
-      return;
-    }
-
     try {
       const result = await deleteJson<{ ok?: boolean; error?: string }>("/api/build-jobs");
       if (!result.ok || !result.data.ok) {
@@ -123,9 +118,9 @@ export function useQueue({ setStatus }: UseQueueOptions) {
       setQueueJobs([]);
       setSelectedQueueJobId(null);
       setSelectedQueueJobLogs([]);
-      setStatus("Cleared queue and output EPUBs.");
+      toast.success("Archived queue and cleared output EPUBs.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Failed to clear queue");
+      toast.error(error instanceof Error ? error.message : "Failed to clear queue");
     }
   }
 

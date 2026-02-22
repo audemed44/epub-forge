@@ -1,7 +1,17 @@
+import { useState } from "react";
 import { basenameFromPath, formatStatus } from "../../shared/utils/format";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBookBookmark, faDownload } from "@fortawesome/free-solid-svg-icons";
 import type { QueueJob } from "../../shared/types/api";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type QueueTabProps = {
   scope: "active" | "archive";
@@ -21,108 +31,155 @@ type QueueTabProps = {
 
 export function QueueTab(props: QueueTabProps) {
   const archiveMode = props.scope === "archive";
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  const progressMax = Math.max(props.selectedQueueJob?.progress.total || props.selectedQueueJob?.totalChapters || 1, 1);
+  const progressValue = Math.min(props.selectedQueueJob?.progress.completed || 0, progressMax);
 
   return (
-    <section className="panel queue-panel">
-      <div className="panel-head">
-        <h2>Build Queue</h2>
-        <div className="queue-head-actions">
-          <button type="button" className={archiveMode ? "tab-pill" : "tab-pill active"} onClick={() => props.setScope("active")}>
-            Queue
-          </button>
-          <button type="button" className={archiveMode ? "tab-pill active" : "tab-pill"} onClick={() => props.setScope("archive")}>
-            Archive
-          </button>
-          <button type="button" onClick={() => void props.loadQueueJobs()}>
+    <Card>
+      <CardHeader className="flex-row items-center justify-between">
+        <CardTitle>Build Queue</CardTitle>
+        <div className="flex flex-wrap items-center gap-2">
+          <Tabs value={props.scope} onValueChange={(value) => props.setScope(value as "active" | "archive")} className="w-auto">
+            <TabsList>
+              <TabsTrigger value="active">Queue</TabsTrigger>
+              <TabsTrigger value="archive">Archive</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Button type="button" variant="neutral" onClick={() => void props.loadQueueJobs()}>
             Refresh
-          </button>
-          <button type="button" onClick={() => void props.onClearAllQueue()} disabled={props.queueJobs.length === 0 || archiveMode}>
+          </Button>
+          <Button type="button" variant="neutral" onClick={() => setShowClearConfirm(true)} disabled={props.queueJobs.length === 0 || archiveMode}>
             Clear All
-          </button>
+          </Button>
         </div>
-      </div>
+      </CardHeader>
 
-      {props.queueJobs.length === 0 ? (
-        <p className="hint">{archiveMode ? "No archived jobs yet." : "No build jobs queued yet."}</p>
-      ) : (
-        <div className="queue-grid">
-          <div className="queue-list">
-            {props.queueJobs.map((job) => (
-              <button
-                type="button"
-                key={job.id}
-                className={props.selectedQueueJobId === job.id ? "queue-item active" : "queue-item"}
-                onClick={() => props.setSelectedQueueJobId(job.id)}
-              >
-                <strong>{job.fileName || job.title || "Untitled"}</strong>
-                <span>{formatStatus(job)}</span>
-              </button>
-            ))}
-          </div>
+      <CardContent>
+        {props.queueJobs.length === 0 ? (
+          <p className="text-sm font-base">{archiveMode ? "No archived jobs yet." : "No build jobs queued yet."}</p>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-[300px_1fr]">
+            <ScrollArea className="h-[460px] rounded-base border-2 border-border">
+              <div className="grid gap-2 p-2">
+                {props.queueJobs.map((job) => (
+                  <Button
+                    type="button"
+                    key={job.id}
+                    variant={props.selectedQueueJobId === job.id ? "default" : "neutral"}
+                    className="h-auto w-full justify-start py-2 text-left whitespace-normal"
+                    onClick={() => props.setSelectedQueueJobId(job.id)}
+                  >
+                    <span className="flex w-full flex-col items-start gap-1">
+                      <span className="w-full break-words">{job.fileName || job.title || "Untitled"}</span>
+                      <span className="text-xs opacity-80">{formatStatus(job)}</span>
+                    </span>
+                  </Button>
+                ))}
+              </div>
+            </ScrollArea>
 
-          <div className="queue-detail">
-            {props.selectedQueueJob ? (
-              <>
-                <p>
-                  <strong>Status:</strong> {props.selectedQueueJob.status}
-                </p>
-                <p>
-                  <strong>Progress:</strong> {props.selectedQueueJob.progress.completed}/
-                  {props.selectedQueueJob.progress.total || props.selectedQueueJob.totalChapters}
-                </p>
-                <progress
-                  max={Math.max(props.selectedQueueJob.progress.total || props.selectedQueueJob.totalChapters || 1, 1)}
-                  value={Math.min(
-                    props.selectedQueueJob.progress.completed,
-                    Math.max(props.selectedQueueJob.progress.total || props.selectedQueueJob.totalChapters || 1, 1)
-                  )}
-                />
+            <Card>
+              <CardContent className="grid gap-3 p-4">
+                {props.selectedQueueJob ? (
+                  <>
+                    <p className="text-sm font-base">
+                      <strong>Status:</strong> {props.selectedQueueJob.status}
+                    </p>
+                    <p className="text-sm font-base">
+                      <strong>Progress:</strong> {props.selectedQueueJob.progress.completed}/
+                      {props.selectedQueueJob.progress.total || props.selectedQueueJob.totalChapters}
+                    </p>
+                    <Progress value={(progressValue / progressMax) * 100} />
 
-                {!archiveMode && props.selectedQueueJob.status === "done" && props.selectedQueueJob.hasResult && (
-                  <div className="queue-actions">
-                    <button
-                      type="button"
-                      className="icon-button"
-                      onClick={() => void props.onDownloadJob(props.selectedQueueJob!.id)}
-                      disabled={props.selectedQueueJob.movedToBookdrop}
-                      title={props.selectedQueueJob.movedToBookdrop ? "Moved to bookdrop" : "Download EPUB"}
-                      aria-label={props.selectedQueueJob.movedToBookdrop ? "Moved to bookdrop" : "Download EPUB"}
-                    >
-                      <FontAwesomeIcon icon={faDownload} aria-hidden="true" />
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-button"
-                      onClick={() => void props.onMoveToBookdrop(props.selectedQueueJob!.id)}
-                      disabled={props.selectedQueueJob.movedToBookdrop}
-                      title="Move to bookdrop"
-                      aria-label="Move to bookdrop"
-                    >
-                      <FontAwesomeIcon icon={faBookBookmark} aria-hidden="true" />
-                    </button>
-                  </div>
+                    {!archiveMode && props.selectedQueueJob.status === "done" && props.selectedQueueJob.hasResult && (
+                      <TooltipProvider>
+                        <div className="flex items-center gap-2">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                size="icon"
+                                onClick={() => void props.onDownloadJob(props.selectedQueueJob!.id)}
+                                disabled={props.selectedQueueJob.movedToBookdrop}
+                                aria-label={props.selectedQueueJob.movedToBookdrop ? "Moved to bookdrop" : "Download EPUB"}
+                              >
+                                <FontAwesomeIcon icon={faDownload} aria-hidden="true" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{props.selectedQueueJob.movedToBookdrop ? "Moved to bookdrop" : "Download EPUB"}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                size="icon"
+                                onClick={() => void props.onMoveToBookdrop(props.selectedQueueJob!.id)}
+                                disabled={props.selectedQueueJob.movedToBookdrop}
+                                aria-label="Move to bookdrop"
+                              >
+                                <FontAwesomeIcon icon={faBookBookmark} aria-hidden="true" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Move to bookdrop</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </TooltipProvider>
+                    )}
+
+                    {props.selectedQueueJob.movedToBookdrop ? (
+                      <p className="text-sm font-base">
+                        Moved to: {props.selectedQueueJob.bookdropPath ? basenameFromPath(props.selectedQueueJob.bookdropPath) : "bookdrop"}
+                      </p>
+                    ) : null}
+
+                    {props.selectedQueueJob.error ? <p className="text-sm font-base text-destructive">{props.selectedQueueJob.error}</p> : null}
+
+                    <div className="flex items-center gap-2">
+                      <Checkbox id="show-logs" checked={props.showLogs} onCheckedChange={(checked) => props.setShowLogs(checked === true)} />
+                      <Label htmlFor="show-logs">Show logs</Label>
+                    </div>
+
+                    {props.showLogs && (
+                      <div className="h-[220px] overflow-auto rounded-base border-2 border-border bg-background p-2 text-xs font-base">
+                        <pre className="min-w-max whitespace-pre">{props.selectedQueueJobLogs.length ? props.selectedQueueJobLogs.join("\n") : "No logs yet..."}</pre>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm font-base">Select a queue item to see details.</p>
                 )}
-
-                {props.selectedQueueJob.movedToBookdrop ? (
-                  <p className="hint">
-                    Moved to: {props.selectedQueueJob.bookdropPath ? basenameFromPath(props.selectedQueueJob.bookdropPath) : "bookdrop"}
-                  </p>
-                ) : null}
-
-                {props.selectedQueueJob.error ? <p className="queue-error">{props.selectedQueueJob.error}</p> : null}
-
-                <label className="logs-toggle">
-                  <input type="checkbox" checked={props.showLogs} onChange={(event) => props.setShowLogs(event.target.checked)} /> Show logs
-                </label>
-
-                {props.showLogs && <pre className="build-logs">{props.selectedQueueJobLogs.length ? props.selectedQueueJobLogs.join("\n") : "No logs yet..."}</pre>}
-              </>
-            ) : (
-              <p className="hint">Select a queue item to see details.</p>
-            )}
+              </CardContent>
+            </Card>
           </div>
-        </div>
-      )}
-    </section>
+        )}
+      </CardContent>
+
+      <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear Queue?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This archives all active queue items and removes generated EPUB files from output storage. Bookdrop files are not touched.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                void props.onClearAllQueue();
+              }}
+            >
+              Clear Queue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
   );
 }

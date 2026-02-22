@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { postJson } from "../../../shared/api/client";
 import { isPreviewResponse } from "../../../shared/api/guards";
 import type { ChapterRef, Metadata } from "../../../shared/types/api";
 
 type UseBuilderOptions = {
-  setStatus: (value: string) => void;
   onJobQueued: (jobId: string) => void;
 };
 
-export function useBuilder({ setStatus, onJobQueued }: UseBuilderOptions) {
+export function useBuilder({ onJobQueued }: UseBuilderOptions) {
   const [url, setUrl] = useState("");
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [isEnqueueing, setIsEnqueueing] = useState(false);
@@ -43,12 +43,11 @@ export function useBuilder({ setStatus, onJobQueued }: UseBuilderOptions) {
   async function onPreview() {
     const inputUrl = url.trim();
     if (!inputUrl) {
-      setStatus("Enter a URL first.");
+      toast.warning("Enter a URL first.");
       return;
     }
 
     setIsPreviewLoading(true);
-    setStatus("Fetching metadata and chapter list...");
 
     try {
       const result = await postJson<unknown>("/api/preview", { url: inputUrl });
@@ -77,10 +76,9 @@ export function useBuilder({ setStatus, onJobQueued }: UseBuilderOptions) {
       setDetectedCoverImageUrl(data.metadata.coverImageUrl || "");
       setCoverUploadName("");
       setFileName(data.metadata.title || "");
-
-      setStatus(`Loaded ${data.chapters.length} chapters with parser '${data.parserId}'.`);
+      toast.success(`Loaded ${data.chapters.length} chapters with parser '${data.parserId}'.`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Preview failed");
+      toast.error(error instanceof Error ? error.message : "Preview failed");
     } finally {
       setIsPreviewLoading(false);
     }
@@ -89,15 +87,15 @@ export function useBuilder({ setStatus, onJobQueued }: UseBuilderOptions) {
   async function onEnqueueBuild() {
     const trimmedUrl = url.trim();
     if (!trimmedUrl) {
-      setStatus("Enter a URL first.");
+      toast.warning("Enter a URL first.");
       return;
     }
     if (!parserId) {
-      setStatus("Run preview before building.");
+      toast.warning("Run preview before building.");
       return;
     }
     if (selectedChapters.length === 0) {
-      setStatus("Pick a valid chapter range.");
+      toast.warning("Pick a valid chapter range.");
       return;
     }
 
@@ -129,9 +127,9 @@ export function useBuilder({ setStatus, onJobQueued }: UseBuilderOptions) {
       }
 
       onJobQueued(result.data.jobId);
-      setStatus(`Build job queued (${result.data.jobId.slice(0, 8)}).`);
+      toast.success(`Build job queued (${result.data.jobId.slice(0, 8)}).`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Failed to enqueue build");
+      toast.error(error instanceof Error ? error.message : "Failed to enqueue build");
     } finally {
       setIsEnqueueing(false);
     }
@@ -142,7 +140,7 @@ export function useBuilder({ setStatus, onJobQueued }: UseBuilderOptions) {
       return;
     }
     if (!file.type.startsWith("image/")) {
-      setStatus("Cover upload must be an image file.");
+      toast.warning("Cover upload must be an image file.");
       return;
     }
 
@@ -161,7 +159,7 @@ export function useBuilder({ setStatus, onJobQueued }: UseBuilderOptions) {
 
     setCoverImageUrl(dataUrl);
     setCoverUploadName(file.name);
-    setStatus(`Using uploaded cover file: ${file.name}`);
+    toast.success(`Using uploaded cover file: ${file.name}`);
   }
 
   return {
