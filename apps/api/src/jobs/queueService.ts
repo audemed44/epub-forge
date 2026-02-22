@@ -2,9 +2,9 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { buildFromSelection, type BuildFromSelectionInput } from "@epub-forge/core";
-import { moveFile, resolveUniqueFilePath } from "../lib/storage.js";
+import { moveFile, resolveUniqueFilePath, safeAsciiFilename } from "../lib/storage.js";
 import { JobsRepository } from "./repository.js";
-import type { BuildJob } from "../types.js";
+import type { BuildJob, BuildJobRequest } from "../types.js";
 
 type QueueServiceOptions = {
   outputDir: string;
@@ -59,7 +59,25 @@ export class BuildQueueService {
     return this.jobs.get(jobId) || this.options.repository.getById(jobId);
   }
 
-  async enqueue(request: BuildFromSelectionInput): Promise<BuildJob> {
+  async checkDuplicateTargetName(preferredFileName: string | null | undefined): Promise<{
+    normalizedFileName: string;
+    inQueue: boolean;
+    onDisk: boolean;
+  }> {
+    const normalizedFileName = safeAsciiFilename(preferredFileName || "book.epub");
+
+    const inQueue = [...this.jobs.values()].some((job) => {
+      const queuedName = safeAsciiFilename(job.request.metadata.fileName || job.request.metadata.title || "book.epub");
+      return queuedName === normalizedFileName;
+    });
+
+    const targetPath = path.join(this.options.outputDir, normalizedFileName);
+    const onDisk = await fileExists(targetPath);
+
+    return { normalizedFileName, inQueue, onDisk };
+  }
+
+  async enqueue(request: BuildJobRequest): Promise<BuildJob> {
     const jobId = randomUUID();
     const job: BuildJob = {
       id: jobId,
@@ -140,7 +158,7 @@ export class BuildQueueService {
           continue;
         }
 
-        const { url, parserId, metadata, chapterUrls } = job.request;
+        const { url, parserId, metadata, chapterUrls, chapterTitles } = job.request;
         job.status = "running";
         job.logs.push(`${new Date().toISOString()} Job started`);
         await this.persist();
@@ -158,7 +176,8 @@ export class BuildQueueService {
               job.progress = progress;
             },
             onLog: (message) => {
-              job.logs.push(`${new Date().toISOString()} ${message}`);
+              const enrichedMessage = enrichChapterLogMessage(message, chapterTitles);
+              job.logs.push(`${new Date().toISOString()} ${enrichedMessage}`);
               if (job.logs.length > 400) {
                 job.logs.shift();
               }
@@ -184,5 +203,40 @@ export class BuildQueueService {
     } finally {
       this.workerRunning = false;
     }
+  }
+}
+
+function enrichChapterLogMessage(message: string, chapterTitles?: string[]): string {
+  if (!Array.isArray(chapterTitles) || chapterTitles.length === 0) {
+    return message;
+  }
+
+  const match = /^Fetching chapter\s+(\d+)\/\d+/i.exec(message);
+  if (!match) {
+    return message;
+  }
+
+  const chapterNumber = Number(match[1]);
+  if (!Number.isFinite(chapterNumber) || chapterNumber < 1) {
+    return message;
+  }
+
+  const chapterTitle = chapterTitles[chapterNumber - 1];
+  if (!chapterTitle) {
+    return message;
+  }
+
+  return `${message}: ${chapterTitle}`;
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fsp.access(filePath);
+    return true;
+  } catch (error) {
+    if ((error as { code?: string }).code === "ENOENT") {
+      return false;
+    }
+    throw error;
   }
 }

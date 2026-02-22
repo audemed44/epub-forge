@@ -73,14 +73,14 @@ export function AppShell() {
                     <TabsList className="h-auto w-full flex-col items-stretch gap-2 bg-transparent p-0">
                       <TabsTrigger
                         value="builder"
-                        className="w-full justify-start border-border bg-main text-lg text-main-foreground data-[state=active]:bg-secondary-background data-[state=active]:text-foreground data-[state=active]:shadow-[var(--shadow)]"
+                        className="w-full justify-start border-border bg-secondary-background text-lg text-foreground data-[state=active]:bg-main data-[state=active]:text-main-foreground data-[state=active]:shadow-[var(--shadow)]"
                         onClick={() => setIsSidebarOpen(false)}
                       >
                         Builder
                       </TabsTrigger>
                       <TabsTrigger
                         value="queue"
-                        className="w-full justify-start border-border bg-main text-lg text-main-foreground data-[state=active]:bg-secondary-background data-[state=active]:text-foreground data-[state=active]:shadow-[var(--shadow)]"
+                        className="w-full justify-start border-border bg-secondary-background text-lg text-foreground data-[state=active]:bg-main data-[state=active]:text-main-foreground data-[state=active]:shadow-[var(--shadow)]"
                         onClick={() => setIsSidebarOpen(false)}
                       >
                         Queue ({activeQueueCount})
@@ -99,13 +99,13 @@ export function AppShell() {
                   <TabsList className="h-auto w-full flex-col items-stretch gap-2 bg-transparent p-0">
                     <TabsTrigger
                       value="builder"
-                      className="w-full justify-start border-border bg-main text-lg text-main-foreground data-[state=active]:bg-secondary-background data-[state=active]:text-foreground data-[state=active]:shadow-[var(--shadow)]"
+                      className="w-full justify-start border-border bg-secondary-background text-lg text-foreground data-[state=active]:bg-main data-[state=active]:text-main-foreground data-[state=active]:shadow-[var(--shadow)]"
                     >
                       Builder
                     </TabsTrigger>
                     <TabsTrigger
                       value="queue"
-                      className="w-full justify-start border-border bg-main text-lg text-main-foreground data-[state=active]:bg-secondary-background data-[state=active]:text-foreground data-[state=active]:shadow-[var(--shadow)]"
+                      className="w-full justify-start border-border bg-secondary-background text-lg text-foreground data-[state=active]:bg-main data-[state=active]:text-main-foreground data-[state=active]:shadow-[var(--shadow)]"
                     >
                       Queue ({activeQueueCount})
                     </TabsTrigger>
@@ -147,6 +147,9 @@ export function AppShell() {
                   selectedChaptersCount={builder.selectedChapters.length}
                   onPreview={builder.onPreview}
                   onEnqueueBuild={builder.onEnqueueBuild}
+                  duplicateWarning={builder.duplicateWarning}
+                  onCloseDuplicateWarning={builder.onCloseDuplicateWarning}
+                  onConfirmDuplicateEnqueue={builder.onConfirmDuplicateEnqueue}
                   onCoverUpload={builder.onCoverUpload}
                 />
               </section>

@@ -2,12 +2,16 @@ import type { BuildFromSelectionInput, BuildProgress } from "@epub-forge/core";
 
 export type BuildJobStatus = "queued" | "running" | "done" | "error";
 
+export type BuildJobRequest = BuildFromSelectionInput & {
+  chapterTitles?: string[];
+};
+
 export type BuildJob = {
   id: string;
   status: BuildJobStatus;
   progress: BuildProgress;
   logs: string[];
-  request: BuildFromSelectionInput;
+  request: BuildJobRequest;
   createdAt: number;
   finishedAt: number | null;
   error: string | null;
