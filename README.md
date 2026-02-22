@@ -34,42 +34,37 @@ Open `http://localhost:3000`.
 
 ## Theming
 
-The web UI theme is token-based and designed to be easy to override.
+The web UI has an in-app theme system under the `Config` tab.
 
-- Base tokens live in `apps/web/src/index.css` under `:root` (`--theme-*` vars).
-- Local/project overrides live in `apps/web/src/theme-overrides.css` (loaded after `index.css`).
-- Components consume derived semantic tokens (`--background`, `--main`, `--foreground`, etc.), so you generally only edit `--theme-*`.
+- `Builder`, `Queue`, and `Config` are top-level tabs in the left nav.
+- Theme selection is in `Config > Theme preset`.
+- Selection is saved in browser `localStorage` (`epub-forge-theme`), so Docker users can switch themes without rebuilding images.
+- Presets are defined in `apps/web/src/theme-overrides.css` as `:root[data-theme="<id>"]` blocks.
+- `Custom` mode in the Config tab provides color pickers for palette tokens plus border/shadow controls.
 
-### Common tokens
+Available in-app presets:
 
-- `--theme-body-background` (page background gradient)
-- `--theme-font-family`
-- `--theme-color-background`
-- `--theme-color-surface`
-- `--theme-color-foreground`
-- `--theme-color-accent`
-- `--theme-color-accent-foreground`
-- `--theme-color-border`
-- `--theme-terminal-background`
-- `--theme-terminal-foreground`
-- `--theme-radius`
-- `--theme-shadow-x`, `--theme-shadow-y`
+- `blue-sky`
+- `green`
+- `red`
+- `oled-sky-blue`
+- `oled-green`
+- `custom`
 
-### Override example
+### Add or modify presets
 
-Edit `apps/web/src/theme-overrides.css`:
+Edit `apps/web/src/theme-overrides.css` and add/update a block:
 
 ```css
-:root {
+:root[data-theme="my-theme"] {
   --theme-body-background: linear-gradient(180deg, #071c46 0%, #051638 55%, #03102a 100%);
   --theme-color-accent: 70% 0.17 222;
   --theme-color-surface: 27% 0.045 258;
   --theme-terminal-foreground: 72% 0.18 150;
-  --theme-radius: 2px;
 }
 ```
 
-Restart `npm run dev` after token changes.
+Then add `"my-theme"` to the `themeOptions` array in `apps/web/src/features/config/theme.ts`.
 
 ## Docker
 

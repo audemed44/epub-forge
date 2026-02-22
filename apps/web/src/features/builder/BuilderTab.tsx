@@ -94,7 +94,7 @@ export function BuilderTab(props: BuilderTabProps) {
               type="url"
               value={props.url}
               onChange={(event) => props.setUrl(event.target.value)}
-              placeholder="https://www.royalroad.com/fiction/151470/re-knight-litrpg-regression"
+              placeholder=""
             />
             <Button onClick={() => void props.onPreview()} disabled={props.isPreviewLoading}>
               {props.isPreviewLoading ? "Loading..." : "Preview"}

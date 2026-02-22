@@ -1,19 +1,70 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BuilderTab } from "../features/builder/BuilderTab";
+import { ConfigTab } from "../features/config/ConfigTab";
+import {
+  customThemeStorageKey,
+  defaultCustomTheme,
+  defaultThemeId,
+  hexToOklchTriplet,
+  isThemeId,
+  normalizeCustomTheme,
+  themeStorageKey,
+  type CustomThemeConfig,
+  type ThemeId,
+} from "../features/config/theme";
 import { useBuilder } from "../features/builder/hooks/useBuilder";
 import { QueueTab } from "../features/queue/QueueTab";
 import { useQueue } from "../features/queue/hooks/useQueue";
-import { Hammer, List, Menu, X } from "lucide-react";
+import { Hammer, List, Menu, Settings2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Toaster } from "@/components/ui/sonner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-type ViewTab = "builder" | "queue";
+type ViewTab = "builder" | "queue" | "config";
+
+const customThemeCssVarMap: Array<[keyof CustomThemeConfig, string]> = [
+  ["shadowX", "--custom-theme-shadow-x"],
+  ["shadowY", "--custom-theme-shadow-y"],
+];
+
+const customColorVarMap: Array<[keyof CustomThemeConfig, string]> = [
+  ["colorBackgroundHex", "--custom-theme-color-background"],
+  ["colorSurfaceHex", "--custom-theme-color-surface"],
+  ["colorForegroundHex", "--custom-theme-color-foreground"],
+  ["colorAccentHex", "--custom-theme-color-accent"],
+  ["colorAccentForegroundHex", "--custom-theme-color-accent-foreground"],
+  ["colorBorderHex", "--custom-theme-color-border"],
+  ["colorRingHex", "--custom-theme-color-ring"],
+  ["terminalBackgroundHex", "--custom-theme-terminal-background"],
+  ["terminalForegroundHex", "--custom-theme-terminal-foreground"],
+];
 
 export function AppShell() {
   const [activeTab, setActiveTab] = useState<ViewTab>("builder");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [theme, setTheme] = useState<ThemeId>(() => {
+    if (typeof window === "undefined") {
+      return defaultThemeId;
+    }
+    const savedTheme = window.localStorage.getItem(themeStorageKey);
+    return savedTheme && isThemeId(savedTheme) ? savedTheme : defaultThemeId;
+  });
+  const [customTheme, setCustomTheme] = useState<CustomThemeConfig>(() => {
+    if (typeof window === "undefined") {
+      return defaultCustomTheme;
+    }
+    const savedCustomTheme = window.localStorage.getItem(customThemeStorageKey);
+    if (!savedCustomTheme) {
+      return defaultCustomTheme;
+    }
+    try {
+      const parsed = JSON.parse(savedCustomTheme) as unknown;
+      return normalizeCustomTheme(parsed);
+    } catch {
+      return defaultCustomTheme;
+    }
+  });
 
   const queue = useQueue({});
   const builder = useBuilder({
@@ -26,6 +77,42 @@ export function AppShell() {
   const activeQueueCount = queue.queueJobs.filter((job) => job.status === "queued" || job.status === "running").length;
   const navTriggerClass =
     "h-11 w-full justify-start gap-2 border-border bg-secondary-background text-[0.95rem] font-heading text-foreground data-[state=active]:bg-main data-[state=active]:text-main-foreground data-[state=active]:shadow-shadow";
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute("data-theme", theme);
+    window.localStorage.setItem(themeStorageKey, theme);
+
+    if (theme === "custom") {
+      const customBackground = `linear-gradient(180deg, ${customTheme.backgroundStartHex} 0%, ${customTheme.backgroundEndHex} 100%)`;
+      root.style.setProperty("--custom-theme-body-background", customBackground);
+
+      for (const [key, cssVar] of customColorVarMap) {
+        root.style.setProperty(cssVar, hexToOklchTriplet(customTheme[key] as string));
+      }
+
+      for (const [key, cssVar] of customThemeCssVarMap) {
+        root.style.setProperty(cssVar, customTheme[key] as string);
+      }
+
+      root.setAttribute("data-custom-borders", customTheme.hideBorders ? "off" : "on");
+      window.localStorage.setItem(customThemeStorageKey, JSON.stringify(customTheme));
+      return;
+    }
+
+    root.removeAttribute("data-custom-borders");
+    root.style.removeProperty("--custom-theme-body-background");
+    for (const [, cssVar] of customColorVarMap) {
+      root.style.removeProperty(cssVar);
+    }
+    for (const [, cssVar] of customThemeCssVarMap) {
+      root.style.removeProperty(cssVar);
+    }
+  }, [theme, customTheme]);
+
+  function handleCustomThemeChange<K extends keyof CustomThemeConfig>(key: K, value: CustomThemeConfig[K]): void {
+    setCustomTheme((current) => ({ ...current, [key]: value }));
+  }
 
   return (
     <main className="min-h-screen px-3 py-5 text-foreground md:px-10 md:py-9">
@@ -73,24 +160,20 @@ export function AppShell() {
                       </Button>
                     </div>
                     <TabsList className="h-auto w-full flex-col items-stretch gap-2 bg-transparent p-0">
-                      <TabsTrigger
-                        value="builder"
-                        className={navTriggerClass}
-                        onClick={() => setIsSidebarOpen(false)}
-                      >
+                      <TabsTrigger value="builder" className={navTriggerClass} onClick={() => setIsSidebarOpen(false)}>
                         <Hammer className="size-4" />
                         Builder
                       </TabsTrigger>
-                      <TabsTrigger
-                        value="queue"
-                        className={navTriggerClass}
-                        onClick={() => setIsSidebarOpen(false)}
-                      >
+                      <TabsTrigger value="queue" className={navTriggerClass} onClick={() => setIsSidebarOpen(false)}>
                         <List className="size-4" />
                         Queue
                         <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full border-2 border-border bg-background px-1 text-[0.7rem] font-heading leading-none text-foreground">
                           {activeQueueCount}
                         </span>
+                      </TabsTrigger>
+                      <TabsTrigger value="config" className={navTriggerClass} onClick={() => setIsSidebarOpen(false)}>
+                        <Settings2 className="size-4" />
+                        Config
                       </TabsTrigger>
                     </TabsList>
                   </CardContent>
@@ -104,22 +187,20 @@ export function AppShell() {
               <Card className="bg-background text-foreground">
                 <CardContent className="p-2">
                   <TabsList className="h-auto w-full flex-col items-stretch gap-2 bg-transparent p-0">
-                    <TabsTrigger
-                      value="builder"
-                      className={navTriggerClass}
-                    >
+                    <TabsTrigger value="builder" className={navTriggerClass}>
                       <Hammer className="size-4" />
                       Builder
                     </TabsTrigger>
-                    <TabsTrigger
-                      value="queue"
-                      className={navTriggerClass}
-                    >
+                    <TabsTrigger value="queue" className={navTriggerClass}>
                       <List className="size-4" />
                       Queue
                       <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full border-2 border-border bg-background px-1 text-[0.7rem] font-heading leading-none text-foreground">
                         {activeQueueCount}
                       </span>
+                    </TabsTrigger>
+                    <TabsTrigger value="config" className={navTriggerClass}>
+                      <Settings2 className="size-4" />
+                      Config
                     </TabsTrigger>
                   </TabsList>
                 </CardContent>
@@ -183,6 +264,18 @@ export function AppShell() {
                   onClearAllQueue={queue.onClearAllQueue}
                   onDownloadJob={queue.onDownloadJob}
                   onMoveToBookdrop={queue.onMoveToBookdrop}
+                />
+              </section>
+            )}
+
+            {activeTab === "config" && (
+              <section className="min-w-0">
+                <ConfigTab
+                  theme={theme}
+                  setTheme={setTheme}
+                  customTheme={customTheme}
+                  onCustomThemeChange={handleCustomThemeChange}
+                  onResetCustomTheme={() => setCustomTheme(defaultCustomTheme)}
                 />
               </section>
             )}

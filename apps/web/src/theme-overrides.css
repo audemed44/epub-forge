@@ -1,13 +1,115 @@
 /*
-  Theme overrides are loaded after index.css.
-  Put only the tokens you want to change under :root.
+  Runtime-selectable theme presets.
+  Active theme is controlled by <html data-theme="...">.
 
-  Example:
-  :root {
-    --theme-color-accent: 67% 0.15 220;
-    --theme-body-background: linear-gradient(180deg, #06153a 0%, #04122f 100%);
-  }
+  Available theme ids:
+  - blue-sky
+  - green
+  - red
+  - oled-sky-blue
+  - oled-green
+  - custom
 */
 
-:root {
+:root[data-theme="blue-sky"] {
+  --theme-body-background: linear-gradient(180deg, #08173e 0%, #061132 45%, #04102f 100%);
+  --theme-color-background: 20.64% 0.056 262.9;
+  --theme-color-surface: 29.48% 0.05 261.75;
+  --theme-color-foreground: 94.17% 0.007 264.52;
+  --theme-color-accent: 74.31% 0.154 228.38;
+  --theme-color-accent-foreground: 93.7% 0.01 235.5;
+  --theme-color-border: 0% 0 0;
+  --theme-color-ring: 74.31% 0.154 228.38;
+  --theme-terminal-background: 0% 0 0;
+  --theme-terminal-foreground: 67.3% 0.199 148.1;
+  --theme-shadow-x: 3px;
+  --theme-shadow-y: 3px;
+}
+
+:root[data-theme="green"] {
+  --theme-body-background: linear-gradient(180deg, #072b1f 0%, #041f17 52%, #031912 100%);
+  --theme-color-background: 23.5% 0.045 164;
+  --theme-color-surface: 30.4% 0.043 165;
+  --theme-color-foreground: 96.2% 0.01 160;
+  --theme-color-accent: 78.5% 0.175 158;
+  --theme-color-accent-foreground: 20.5% 0.028 160;
+  --theme-color-border: 0% 0 0;
+  --theme-color-ring: 78.5% 0.175 158;
+  --theme-terminal-background: 0% 0 0;
+  --theme-terminal-foreground: 74.5% 0.175 151;
+  --theme-shadow-x: 3px;
+  --theme-shadow-y: 3px;
+}
+
+:root[data-theme="red"] {
+  --theme-body-background: linear-gradient(180deg, #341015 0%, #260b10 52%, #1c090d 100%);
+  --theme-color-background: 24.5% 0.052 18;
+  --theme-color-surface: 31% 0.048 20;
+  --theme-color-foreground: 96.5% 0.008 20;
+  --theme-color-accent: 69.8% 0.212 25;
+  --theme-color-accent-foreground: 96% 0.008 20;
+  --theme-color-border: 0% 0 0;
+  --theme-color-ring: 69.8% 0.212 25;
+  --theme-terminal-background: 0% 0 0;
+  --theme-terminal-foreground: 69.8% 0.212 25;
+  --theme-shadow-x: 3px;
+  --theme-shadow-y: 3px;
+}
+
+:root[data-theme="oled-sky-blue"] {
+  --theme-body-background: linear-gradient(180deg, #000000 0%, #000000 100%);
+  --theme-color-background: 0% 0 0;
+  --theme-color-surface: 19% 0 0;
+  --theme-color-foreground: 98% 0 0;
+  --theme-color-accent: 78% 0.16 238;
+  --theme-color-accent-foreground: 10% 0 0;
+  --theme-color-border: 100% 0 0;
+  --theme-color-ring: 78% 0.16 238;
+  --theme-terminal-background: 0% 0 0;
+  --theme-terminal-foreground: 78% 0.16 238;
+  --theme-shadow-x: 0px;
+  --theme-shadow-y: 0px;
+}
+
+:root[data-theme="oled-green"] {
+  --theme-body-background: linear-gradient(180deg, #000000 0%, #000000 100%);
+  --theme-color-background: 0% 0 0;
+  --theme-color-surface: 19% 0 0;
+  --theme-color-foreground: 98% 0 0;
+  --theme-color-accent: 84% 0.182 145;
+  --theme-color-accent-foreground: 10% 0 0;
+  --theme-color-border: 100% 0 0;
+  --theme-color-ring: 84% 0.182 145;
+  --theme-terminal-background: 0% 0 0;
+  --theme-terminal-foreground: 84% 0.182 145;
+  --theme-shadow-x: 0px;
+  --theme-shadow-y: 0px;
+}
+
+:root[data-theme="custom"] {
+  --theme-body-background: var(--custom-theme-body-background, linear-gradient(180deg, #000000 0%, #000000 100%));
+  --theme-color-background: var(--custom-theme-color-background, 0% 0 0);
+  --theme-color-surface: var(--custom-theme-color-surface, 19% 0 0);
+  --theme-color-foreground: var(--custom-theme-color-foreground, 98% 0 0);
+  --theme-color-accent: var(--custom-theme-color-accent, 84% 0.182 145);
+  --theme-color-accent-foreground: var(--custom-theme-color-accent-foreground, 10% 0 0);
+  --theme-color-border: var(--custom-theme-color-border, 100% 0 0);
+  --theme-color-ring: var(--custom-theme-color-ring, 84% 0.182 145);
+  --theme-terminal-background: var(--custom-theme-terminal-background, 0% 0 0);
+  --theme-terminal-foreground: var(--custom-theme-terminal-foreground, 84% 0.182 145);
+  --theme-shadow-x: var(--custom-theme-shadow-x, 0px);
+  --theme-shadow-y: var(--custom-theme-shadow-y, 0px);
+}
+
+/* OLED-like presets: remove hard borders from neobrutalist utility classes. */
+:root[data-theme="oled-sky-blue"] .border-2,
+:root[data-theme="oled-green"] .border-2,
+:root[data-theme="custom"][data-custom-borders="off"] .border-2 {
+  border-width: 0 !important;
+}
+
+:root[data-theme="oled-sky-blue"] .border-r-2,
+:root[data-theme="oled-green"] .border-r-2,
+:root[data-theme="custom"][data-custom-borders="off"] .border-r-2 {
+  border-right-width: 0 !important;
 }
