@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { basenameFromPath, formatStatus } from "../../shared/utils/format";
+import { useMemo, useState } from "react";
+import { basenameFromPath, formatAbsoluteDateTime, formatRelativeTime, formatStatus } from "../../shared/utils/format";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBookBookmark, faDownload } from "@fortawesome/free-solid-svg-icons";
 import type { QueueJob } from "../../shared/types/api";
@@ -7,6 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -32,9 +33,21 @@ type QueueTabProps = {
 export function QueueTab(props: QueueTabProps) {
   const archiveMode = props.scope === "archive";
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [jobSearch, setJobSearch] = useState("");
 
   const progressMax = Math.max(props.selectedQueueJob?.progress.total || props.selectedQueueJob?.totalChapters || 1, 1);
   const progressValue = Math.min(props.selectedQueueJob?.progress.completed || 0, progressMax);
+  const normalizedJobSearch = jobSearch.trim().toLowerCase();
+  const filteredQueueJobs = useMemo(() => {
+    if (!normalizedJobSearch) {
+      return props.queueJobs;
+    }
+    return props.queueJobs.filter((job) => {
+      const name = (job.fileName || job.title || "Untitled").toLowerCase();
+      const status = formatStatus(job).toLowerCase();
+      return name.includes(normalizedJobSearch) || status.includes(normalizedJobSearch);
+    });
+  }, [props.queueJobs, normalizedJobSearch]);
 
   return (
     <Card>
@@ -57,13 +70,26 @@ export function QueueTab(props: QueueTabProps) {
       </CardHeader>
 
       <CardContent>
+        <div className="mb-3 grid gap-2 md:max-w-md">
+          <Label htmlFor="queue-search">Search {archiveMode ? "archive" : "queue"}</Label>
+          <Input
+            id="queue-search"
+            type="text"
+            value={jobSearch}
+            onChange={(event) => setJobSearch(event.target.value)}
+            placeholder={`Filter ${archiveMode ? "archived" : "queued"} jobs by title or status`}
+          />
+        </div>
+
         {props.queueJobs.length === 0 ? (
           <p className="text-sm font-base">{archiveMode ? "No archived jobs yet." : "No build jobs queued yet."}</p>
+        ) : filteredQueueJobs.length === 0 ? (
+          <p className="text-sm font-base">No jobs match your search.</p>
         ) : (
           <div className="grid gap-3 md:grid-cols-[300px_1fr]">
-            <ScrollArea className="h-[460px] rounded-base border-2 border-border">
+            <ScrollArea className="h-[300px] rounded-base border-2 border-border md:h-[320px]">
               <div className="grid gap-2 p-2">
-                {props.queueJobs.map((job) => (
+                {filteredQueueJobs.map((job) => (
                   <Button
                     type="button"
                     key={job.id}
@@ -73,7 +99,22 @@ export function QueueTab(props: QueueTabProps) {
                   >
                     <span className="flex w-full flex-col items-start gap-1">
                       <span className="w-full break-words">{job.fileName || job.title || "Untitled"}</span>
-                      <span className="text-xs opacity-80">{formatStatus(job)}</span>
+                      <span className="flex items-center gap-1 text-xs opacity-80">
+                        <span>{formatStatus(job)}</span>
+                        <span aria-hidden="true">·</span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-help underline decoration-dotted underline-offset-2">
+                                {formatRelativeTime(job.finishedAt ?? job.createdAt)}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{formatAbsoluteDateTime(job.finishedAt ?? job.createdAt)}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </span>
                     </span>
                   </Button>
                 ))}

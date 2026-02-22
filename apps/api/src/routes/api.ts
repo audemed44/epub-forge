@@ -8,6 +8,8 @@ import type { BuildQueueService } from "../jobs/queueService.js";
 type BuildRoutePayload = {
   url?: string;
   parserId?: string | null;
+  force?: boolean;
+  chapterTitles?: string[];
   metadata?: {
     sourceUrl: string;
     title: string;
@@ -61,14 +63,36 @@ export function createApiRouter(queue: BuildQueueService) {
 
   router.post("/build-jobs", async (req: any, res: any) => {
     try {
-      const { url, parserId = null, metadata, chapterUrls = [] } = (req.body || {}) as BuildRoutePayload;
+      const { url, parserId = null, metadata, chapterUrls = [], chapterTitles = [], force = false } = (req.body || {}) as BuildRoutePayload;
       if (!url || !metadata) {
         return res.status(400).json({ error: "url and metadata are required" });
       }
-      const job = await queue.enqueue({ url, parserId, metadata, chapterUrls });
+
+      const duplicate = await queue.checkDuplicateTargetName(metadata.fileName || metadata.title || "book.epub");
+      if (!force && (duplicate.inQueue || duplicate.onDisk)) {
+        return res.status(409).json({
+          error: "A file with the same name already exists in queue or output. Continue anyway?",
+          duplicate,
+        });
+      }
+      const job = await queue.enqueue({ url, parserId, metadata, chapterUrls, chapterTitles });
       return res.json({ jobId: job.id });
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : "Failed to enqueue build" });
+    }
+  });
+
+  router.post("/build-jobs/check-duplicate", async (req: any, res: any) => {
+    try {
+      const { metadata } = (req.body || {}) as BuildRoutePayload;
+      if (!metadata) {
+        return res.status(400).json({ error: "metadata is required" });
+      }
+
+      const duplicate = await queue.checkDuplicateTargetName(metadata.fileName || metadata.title || "book.epub");
+      return res.json({ duplicate });
+    } catch (error) {
+      return res.status(400).json({ error: error instanceof Error ? error.message : "Failed to check duplicate" });
     }
   });
 

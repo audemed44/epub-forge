@@ -26,6 +26,18 @@ export function useBuilder({ onJobQueued }: UseBuilderOptions) {
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [detectedCoverImageUrl, setDetectedCoverImageUrl] = useState("");
   const [coverUploadName, setCoverUploadName] = useState("");
+  const [duplicateWarning, setDuplicateWarning] = useState<{
+    normalizedFileName: string;
+    inQueue: boolean;
+    onDisk: boolean;
+  } | null>(null);
+  const [pendingPayload, setPendingPayload] = useState<{
+    url: string;
+    parserId: string;
+    chapterUrls: string[];
+    chapterTitles: string[];
+    metadata: Metadata;
+  } | null>(null);
 
   const hasPreview = chapters.length > 0;
 
@@ -84,6 +96,53 @@ export function useBuilder({ onJobQueued }: UseBuilderOptions) {
     }
   }
 
+  async function enqueueBuild(
+    payload: {
+      url: string;
+      parserId: string;
+      chapterUrls: string[];
+      chapterTitles: string[];
+      metadata: Metadata;
+    },
+    force: boolean
+  ) {
+    const result = await postJson<{
+      jobId?: string;
+      error?: string;
+      duplicate?: { normalizedFileName: string; inQueue: boolean; onDisk: boolean };
+    }>("/api/build-jobs", { ...payload, force });
+
+    if (!result.ok) {
+      if (result.status === 409 && result.data.duplicate) {
+        setPendingPayload(payload);
+        setDuplicateWarning(result.data.duplicate);
+        return;
+      }
+      throw new Error(result.data.error || "Failed to enqueue build job");
+    }
+
+    if (!result.data.jobId) {
+      throw new Error("Failed to enqueue build job");
+    }
+
+    setDuplicateWarning(null);
+    setPendingPayload(null);
+    onJobQueued(result.data.jobId);
+    toast.success(`Build job queued (${result.data.jobId.slice(0, 8)}).`);
+  }
+
+  async function precheckDuplicate(payload: { metadata: Metadata }) {
+    const result = await postJson<{
+      duplicate?: { normalizedFileName: string; inQueue: boolean; onDisk: boolean };
+      error?: string;
+    }>("/api/build-jobs/check-duplicate", { metadata: payload.metadata });
+
+    if (!result.ok || !result.data.duplicate) {
+      throw new Error(result.data.error || "Failed to check duplicate file name");
+    }
+    return result.data.duplicate;
+  }
+
   async function onEnqueueBuild() {
     const trimmedUrl = url.trim();
     if (!trimmedUrl) {
@@ -103,11 +162,13 @@ export function useBuilder({ onJobQueued }: UseBuilderOptions) {
       url: string;
       parserId: string;
       chapterUrls: string[];
+      chapterTitles: string[];
       metadata: Metadata;
     } = {
       url: trimmedUrl,
       parserId,
       chapterUrls: selectedChapters.map((chapter) => chapter.sourceUrl),
+      chapterTitles: selectedChapters.map((chapter) => chapter.title),
       metadata: {
         sourceUrl: trimmedUrl,
         title: title.trim(),
@@ -121,18 +182,40 @@ export function useBuilder({ onJobQueued }: UseBuilderOptions) {
 
     setIsEnqueueing(true);
     try {
-      const result = await postJson<{ jobId?: string; error?: string }>("/api/build-jobs", payload);
-      if (!result.ok || !result.data.jobId) {
-        throw new Error(result.data.error || "Failed to enqueue build job");
+      const duplicate = await precheckDuplicate(payload);
+      if (duplicate.inQueue || duplicate.onDisk) {
+        setPendingPayload(payload);
+        setDuplicateWarning(duplicate);
+        return;
       }
 
-      onJobQueued(result.data.jobId);
-      toast.success(`Build job queued (${result.data.jobId.slice(0, 8)}).`);
+      await enqueueBuild(payload, false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to enqueue build");
     } finally {
       setIsEnqueueing(false);
     }
+  }
+
+  async function onConfirmDuplicateEnqueue() {
+    if (!pendingPayload) {
+      setDuplicateWarning(null);
+      return;
+    }
+
+    setIsEnqueueing(true);
+    try {
+      await enqueueBuild(pendingPayload, true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to enqueue build");
+    } finally {
+      setIsEnqueueing(false);
+    }
+  }
+
+  function onCloseDuplicateWarning() {
+    setDuplicateWarning(null);
+    setPendingPayload(null);
   }
 
   async function onCoverUpload(file: File | null) {
@@ -189,6 +272,9 @@ export function useBuilder({ onJobQueued }: UseBuilderOptions) {
     setDetectedCoverImageUrl,
     coverUploadName,
     setCoverUploadName,
+    duplicateWarning,
+    onConfirmDuplicateEnqueue,
+    onCloseDuplicateWarning,
     hasPreview,
     selectedRange,
     selectedChapters,

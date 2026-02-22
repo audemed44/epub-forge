@@ -1,4 +1,9 @@
+import { useMemo, useRef, useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faUpload } from "@fortawesome/free-solid-svg-icons";
+import { Search } from "lucide-react";
 import { chapterLabel } from "../../shared/utils/format";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { ChapterRef } from "../../shared/types/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,10 +44,43 @@ type BuilderTabProps = {
   selectedChaptersCount: number;
   onPreview: () => Promise<void>;
   onEnqueueBuild: () => Promise<void>;
+  duplicateWarning: { normalizedFileName: string; inQueue: boolean; onDisk: boolean } | null;
+  onCloseDuplicateWarning: () => void;
+  onConfirmDuplicateEnqueue: () => Promise<void>;
   onCoverUpload: (file: File | null) => Promise<void>;
 };
 
 export function BuilderTab(props: BuilderTabProps) {
+  const coverFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [startChapterSearch, setStartChapterSearch] = useState("");
+  const [endChapterSearch, setEndChapterSearch] = useState("");
+
+  const searchableChapters = useMemo(
+    () =>
+      props.chapters.map((chapter, index) => ({
+        chapter,
+        index,
+        label: chapterLabel(chapter, index),
+      })),
+    [props.chapters],
+  );
+
+  const filteredStartChapters = useMemo(() => {
+    const normalizedStartChapterSearch = startChapterSearch.trim().toLowerCase();
+    if (!normalizedStartChapterSearch) {
+      return searchableChapters;
+    }
+    return searchableChapters.filter((item) => item.label.toLowerCase().includes(normalizedStartChapterSearch));
+  }, [searchableChapters, startChapterSearch]);
+
+  const filteredEndChapters = useMemo(() => {
+    const normalizedEndChapterSearch = endChapterSearch.trim().toLowerCase();
+    if (!normalizedEndChapterSearch) {
+      return searchableChapters;
+    }
+    return searchableChapters.filter((item) => item.label.toLowerCase().includes(normalizedEndChapterSearch));
+  }, [searchableChapters, endChapterSearch]);
+
   return (
     <div className="grid gap-4">
       <Card>
@@ -106,13 +144,24 @@ export function BuilderTab(props: BuilderTabProps) {
             </div>
             <div className="grid gap-2 md:col-span-2">
               <Label>Upload cover image (optional)</Label>
-              <Input type="file" accept="image/*" onChange={(event) => void props.onCoverUpload(event.target.files?.[0] ?? null)} />
+              <input
+                ref={coverFileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => void props.onCoverUpload(event.target.files?.[0] ?? null)}
+              />
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="button" onClick={() => coverFileInputRef.current?.click()} aria-label="Upload cover image">
+                  <FontAwesomeIcon icon={faUpload} aria-hidden="true" />
+                </Button>
+                <span className="text-sm font-base text-foreground/80">{props.coverUploadName || "No file chosen"}</span>
+              </div>
               {props.coverUploadName ? <p className="text-xs font-base">Uploaded: {props.coverUploadName}</p> : null}
             </div>
             <div className="flex flex-wrap gap-2 md:col-span-2">
               <Button
                 type="button"
-                variant="neutral"
                 onClick={() => {
                   props.setCoverImageUrl(props.detectedCoverImageUrl);
                   props.setCoverUploadName("");
@@ -122,7 +171,6 @@ export function BuilderTab(props: BuilderTabProps) {
               </Button>
               <Button
                 type="button"
-                variant="neutral"
                 onClick={() => {
                   props.setCoverImageUrl("");
                   props.setCoverUploadName("");
@@ -157,11 +205,25 @@ export function BuilderTab(props: BuilderTabProps) {
                   <SelectValue placeholder="Select start chapter" />
                 </SelectTrigger>
                 <SelectContent>
-                  {props.chapters.map((chapter, index) => (
-                    <SelectItem key={chapter.id} value={String(index)}>
-                      {chapterLabel(chapter, index)}
+                  <div className="sticky top-0 z-10 border-b-2 border-border bg-secondary-background p-2">
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-foreground/70" />
+                      <Input
+                        type="text"
+                        value={startChapterSearch}
+                        onChange={(event) => setStartChapterSearch(event.target.value)}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        placeholder="Search chapters..."
+                        className="h-9 pl-8"
+                      />
+                    </div>
+                  </div>
+                  {filteredStartChapters.map((item) => (
+                    <SelectItem key={item.chapter.id} value={String(item.index)}>
+                      {item.label}
                     </SelectItem>
                   ))}
+                  {filteredStartChapters.length === 0 ? <p className="px-2 py-1.5 text-sm text-foreground/70">No chapters match your search.</p> : null}
                 </SelectContent>
               </Select>
             </div>
@@ -172,11 +234,25 @@ export function BuilderTab(props: BuilderTabProps) {
                   <SelectValue placeholder="Select end chapter" />
                 </SelectTrigger>
                 <SelectContent>
-                  {props.chapters.map((chapter, index) => (
-                    <SelectItem key={chapter.id} value={String(index)}>
-                      {chapterLabel(chapter, index)}
+                  <div className="sticky top-0 z-10 border-b-2 border-border bg-secondary-background p-2">
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-foreground/70" />
+                      <Input
+                        type="text"
+                        value={endChapterSearch}
+                        onChange={(event) => setEndChapterSearch(event.target.value)}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        placeholder="Search chapters..."
+                        className="h-9 pl-8"
+                      />
+                    </div>
+                  </div>
+                  {filteredEndChapters.map((item) => (
+                    <SelectItem key={item.chapter.id} value={String(item.index)}>
+                      {item.label}
                     </SelectItem>
                   ))}
+                  {filteredEndChapters.length === 0 ? <p className="px-2 py-1.5 text-sm text-foreground/70">No chapters match your search.</p> : null}
                 </SelectContent>
               </Select>
             </div>
@@ -186,6 +262,37 @@ export function BuilderTab(props: BuilderTabProps) {
           </CardContent>
         </Card>
       )}
+
+      <AlertDialog
+        open={props.duplicateWarning !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            props.onCloseDuplicateWarning();
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Duplicate file name detected</AlertDialogTitle>
+            <AlertDialogDescription>
+              {`"${props.duplicateWarning?.normalizedFileName || "book.epub"}" already exists`}
+              {props.duplicateWarning?.inQueue ? " in queue" : ""}
+              {props.duplicateWarning?.inQueue && props.duplicateWarning?.onDisk ? " and " : ""}
+              {props.duplicateWarning?.onDisk ? " in your EPUB output folder" : ""}. Continue anyway?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={props.onCloseDuplicateWarning}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                void props.onConfirmDuplicateEnqueue();
+              }}
+            >
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
