@@ -1,9 +1,10 @@
 import { NovelFireParser } from "./parsers/novelFireParser.js";
 import { RoyalRoadParser } from "./parsers/royalRoadParser.js";
+import { WanderingInnParser } from "./parsers/wanderingInnParser.js";
 import { WordpressGenericParser } from "./parsers/wordpressGenericParser.js";
 import type { StoryParser } from "./types.js";
 
-const parsers: StoryParser[] = [new RoyalRoadParser(), new NovelFireParser(), new WordpressGenericParser()];
+const parsers: StoryParser[] = [new RoyalRoadParser(), new NovelFireParser(), new WanderingInnParser(), new WordpressGenericParser()];
 
 export function getParsers(): StoryParser[] {
   return parsers;
