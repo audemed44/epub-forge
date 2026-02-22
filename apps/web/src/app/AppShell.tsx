@@ -3,7 +3,7 @@ import { BuilderTab } from "../features/builder/BuilderTab";
 import { useBuilder } from "../features/builder/hooks/useBuilder";
 import { QueueTab } from "../features/queue/QueueTab";
 import { useQueue } from "../features/queue/hooks/useQueue";
-import { Menu, X } from "lucide-react";
+import { Hammer, List, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Toaster } from "@/components/ui/sonner";
@@ -24,12 +24,14 @@ export function AppShell() {
   });
 
   const activeQueueCount = queue.queueJobs.filter((job) => job.status === "queued" || job.status === "running").length;
+  const navTriggerClass =
+    "h-11 w-full justify-start gap-2 border-border bg-secondary-background text-[0.95rem] font-heading text-foreground data-[state=active]:bg-main data-[state=active]:text-main-foreground data-[state=active]:shadow-shadow";
 
   return (
-    <main className="min-h-screen px-4 py-4 text-foreground md:px-8 md:py-6">
+    <main className="min-h-screen px-3 py-5 text-foreground md:px-10 md:py-9">
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ViewTab)}>
-        <div className="mx-auto w-full max-w-7xl space-y-4">
-          <section className="relative mx-auto max-w-5xl space-y-3 px-2 py-4 text-center">
+        <div className="mx-auto w-full max-w-[1130px] space-y-6">
+          <section className="relative mx-auto max-w-5xl space-y-4 px-2 py-4 text-center">
             <Button
               type="button"
               variant="neutral"
@@ -40,9 +42,9 @@ export function AppShell() {
             >
               <Menu />
             </Button>
-            <p className="text-base font-bold uppercase tracking-[0.12em] text-foreground/80">Self-Hosted WebToEPUB</p>
-            <h1 className="text-4xl font-heading leading-tight md:text-6xl">EPUB Forge</h1>
-            <p className="text-xl font-base leading-snug text-foreground md:text-2xl">
+            <p className="text-[0.68rem] font-heading uppercase tracking-[0.18em] text-main">Self-Hosted WebToEPUB</p>
+            <h1 className="text-5xl font-heading leading-tight tracking-tight text-foreground md:text-7xl">EPUB Forge</h1>
+            <p className="text-lg font-base leading-snug text-foreground/60 md:text-[1.95rem]">
               Queue builds, monitor progress, and download EPUBs when they are ready.
             </p>
           </section>
@@ -73,17 +75,22 @@ export function AppShell() {
                     <TabsList className="h-auto w-full flex-col items-stretch gap-2 bg-transparent p-0">
                       <TabsTrigger
                         value="builder"
-                        className="w-full justify-start border-border bg-secondary-background text-lg text-foreground data-[state=active]:bg-main data-[state=active]:text-main-foreground data-[state=active]:shadow-[var(--shadow)]"
+                        className={navTriggerClass}
                         onClick={() => setIsSidebarOpen(false)}
                       >
+                        <Hammer className="size-4" />
                         Builder
                       </TabsTrigger>
                       <TabsTrigger
                         value="queue"
-                        className="w-full justify-start border-border bg-secondary-background text-lg text-foreground data-[state=active]:bg-main data-[state=active]:text-main-foreground data-[state=active]:shadow-[var(--shadow)]"
+                        className={navTriggerClass}
                         onClick={() => setIsSidebarOpen(false)}
                       >
-                        Queue ({activeQueueCount})
+                        <List className="size-4" />
+                        Queue
+                        <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full border-2 border-border bg-background px-1 text-[0.7rem] font-heading leading-none text-foreground">
+                          {activeQueueCount}
+                        </span>
                       </TabsTrigger>
                     </TabsList>
                   </CardContent>
@@ -92,22 +99,27 @@ export function AppShell() {
             </div>
           ) : null}
 
-          <div className="grid gap-4 md:grid-cols-[260px_minmax(0,1fr)] md:items-start">
-            <aside className="hidden md:sticky md:top-4 md:block">
+          <div className="grid gap-5 md:grid-cols-[180px_minmax(0,1fr)] md:items-start">
+            <aside className="hidden md:sticky md:top-6 md:block">
               <Card className="bg-background text-foreground">
-                <CardContent className="p-3">
+                <CardContent className="p-2">
                   <TabsList className="h-auto w-full flex-col items-stretch gap-2 bg-transparent p-0">
                     <TabsTrigger
                       value="builder"
-                      className="w-full justify-start border-border bg-secondary-background text-lg text-foreground data-[state=active]:bg-main data-[state=active]:text-main-foreground data-[state=active]:shadow-[var(--shadow)]"
+                      className={navTriggerClass}
                     >
+                      <Hammer className="size-4" />
                       Builder
                     </TabsTrigger>
                     <TabsTrigger
                       value="queue"
-                      className="w-full justify-start border-border bg-secondary-background text-lg text-foreground data-[state=active]:bg-main data-[state=active]:text-main-foreground data-[state=active]:shadow-[var(--shadow)]"
+                      className={navTriggerClass}
                     >
-                      Queue ({activeQueueCount})
+                      <List className="size-4" />
+                      Queue
+                      <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full border-2 border-border bg-background px-1 text-[0.7rem] font-heading leading-none text-foreground">
+                        {activeQueueCount}
+                      </span>
                     </TabsTrigger>
                   </TabsList>
                 </CardContent>
