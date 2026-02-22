@@ -37,8 +37,12 @@ Use `vendor/WebToEpub` as a behavioral reference when implementing or debugging 
 - Use Conventional Commit style seen in history: `feat: ...`, `feat(web): ...`, `fix: ...`, `refactor: ...`, `chore: ...`, `ci: ...`.
 - Keep commits focused and scoped to one change area.
 - Branch workflow:
-  - Each new chat/task must start on a new branch created from `main`.
+  - Before creating a task branch, checkout `main` and pull the latest changes from `origin/main`.
+  - Each new chat/task must start on a new branch created from up-to-date `main`.
   - If `main` moves ahead while working, rebase your branch onto `main` before opening/updating the PR.
+  - Merge to `main` only by merging a GitHub PR.
+  - Do not merge branches into `main` locally.
+  - If a local merge to `main` happens accidentally, stop and ask how to proceed.
 - PRs should include:
   - Clear summary of behavior changes.
   - Linked issue/context when applicable.
