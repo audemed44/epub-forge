@@ -34,10 +34,17 @@ export async function createApp() {
   app.use("/api", createApiRouter(queue));
 
   if (process.env.ONE_PORT_DEV === "1") {
+    const allowedHosts = (process.env.VITE_ALLOWED_HOSTS || "localhost,127.0.0.1")
+      .split(",")
+      .map((host) => host.trim())
+      .filter(Boolean);
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       root: path.resolve(process.cwd(), "apps/web"),
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        allowedHosts,
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);

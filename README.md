@@ -17,6 +17,12 @@ This starts:
 
 - One-port dev server on `http://localhost:3000` (API + Vite UI middleware)
 
+Use a different port when needed:
+
+```bash
+npm run dev -- --port 4317
+```
+
 For production-style local run:
 
 ```bash
@@ -25,6 +31,45 @@ npm start
 ```
 
 Open `http://localhost:3000`.
+
+## Theming
+
+The web UI theme is token-based and designed to be easy to override.
+
+- Base tokens live in `apps/web/src/index.css` under `:root` (`--theme-*` vars).
+- Local/project overrides live in `apps/web/src/theme-overrides.css` (loaded after `index.css`).
+- Components consume derived semantic tokens (`--background`, `--main`, `--foreground`, etc.), so you generally only edit `--theme-*`.
+
+### Common tokens
+
+- `--theme-body-background` (page background gradient)
+- `--theme-font-family`
+- `--theme-color-background`
+- `--theme-color-surface`
+- `--theme-color-foreground`
+- `--theme-color-accent`
+- `--theme-color-accent-foreground`
+- `--theme-color-border`
+- `--theme-terminal-background`
+- `--theme-terminal-foreground`
+- `--theme-radius`
+- `--theme-shadow-x`, `--theme-shadow-y`
+
+### Override example
+
+Edit `apps/web/src/theme-overrides.css`:
+
+```css
+:root {
+  --theme-body-background: linear-gradient(180deg, #071c46 0%, #051638 55%, #03102a 100%);
+  --theme-color-accent: 70% 0.17 222;
+  --theme-color-surface: 27% 0.045 258;
+  --theme-terminal-foreground: 72% 0.18 150;
+  --theme-radius: 2px;
+}
+```
+
+Restart `npm run dev` after token changes.
 
 ## Docker
 

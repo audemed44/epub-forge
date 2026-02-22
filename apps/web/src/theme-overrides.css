@@ -1,0 +1,13 @@
+/*
+  Theme overrides are loaded after index.css.
+  Put only the tokens you want to change under :root.
+
+  Example:
+  :root {
+    --theme-color-accent: 67% 0.15 220;
+    --theme-body-background: linear-gradient(180deg, #06153a 0%, #04122f 100%);
+  }
+*/
+
+:root {
+}

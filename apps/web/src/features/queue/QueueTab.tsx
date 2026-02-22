@@ -50,34 +50,48 @@ export function QueueTab(props: QueueTabProps) {
   }, [props.queueJobs, normalizedJobSearch]);
 
   return (
-    <Card>
+    <Card className="bg-background">
       <CardHeader className="flex-row items-center justify-between">
-        <CardTitle>Build Queue</CardTitle>
+        <CardTitle className="text-[2rem] md:text-[2.15rem]">Build Queue</CardTitle>
         <div className="flex flex-wrap items-center gap-2">
           <Tabs value={props.scope} onValueChange={(value) => props.setScope(value as "active" | "archive")} className="w-auto">
-            <TabsList>
-              <TabsTrigger value="active">Queue</TabsTrigger>
-              <TabsTrigger value="archive">Archive</TabsTrigger>
+            <TabsList className="h-9 rounded-base p-1">
+              <TabsTrigger className="h-7 px-3 text-xs font-heading" value="active">
+                Queue
+              </TabsTrigger>
+              <TabsTrigger className="h-7 px-3 text-xs font-heading" value="archive">
+                Archive
+              </TabsTrigger>
             </TabsList>
           </Tabs>
-          <Button type="button" variant="neutral" onClick={() => void props.loadQueueJobs()}>
+          <Button type="button" variant="neutral" size="sm" className="text-xs" onClick={() => void props.loadQueueJobs()}>
             Refresh
           </Button>
-          <Button type="button" variant="neutral" onClick={() => setShowClearConfirm(true)} disabled={props.queueJobs.length === 0 || archiveMode}>
+          <Button
+            type="button"
+            variant="neutral"
+            size="sm"
+            className="text-xs"
+            onClick={() => setShowClearConfirm(true)}
+            disabled={props.queueJobs.length === 0 || archiveMode}
+          >
             Clear All
           </Button>
         </div>
       </CardHeader>
 
       <CardContent>
-        <div className="mb-3 grid gap-2 md:max-w-md">
-          <Label htmlFor="queue-search">Search {archiveMode ? "archive" : "queue"}</Label>
+        <div className="mb-5 grid gap-2">
+          <Label htmlFor="queue-search" className="text-sm text-foreground/95">
+            Search {archiveMode ? "archive" : "queue"}
+          </Label>
           <Input
             id="queue-search"
             type="text"
             value={jobSearch}
             onChange={(event) => setJobSearch(event.target.value)}
             placeholder={`Filter ${archiveMode ? "archived" : "queued"} jobs by title or status`}
+            className="md:max-w-full"
           />
         </div>
 
@@ -86,15 +100,15 @@ export function QueueTab(props: QueueTabProps) {
         ) : filteredQueueJobs.length === 0 ? (
           <p className="text-sm font-base">No jobs match your search.</p>
         ) : (
-          <div className="grid gap-3 md:grid-cols-[300px_1fr]">
-            <ScrollArea className="h-[300px] rounded-base border-2 border-border md:h-[320px]">
+          <div className="grid min-w-0 gap-3 md:grid-cols-[320px_minmax(0,1fr)]">
+            <ScrollArea className="h-[320px] w-full max-w-full rounded-base border-2 border-border md:h-[560px]">
               <div className="grid gap-2 p-2">
                 {filteredQueueJobs.map((job) => (
                   <Button
                     type="button"
                     key={job.id}
                     variant={props.selectedQueueJobId === job.id ? "default" : "neutral"}
-                    className="h-auto w-full justify-start py-2 text-left whitespace-normal"
+                    className="h-auto w-full max-w-full justify-start py-2.5 text-left whitespace-normal"
                     onClick={() => props.setSelectedQueueJobId(job.id)}
                   >
                     <span className="flex w-full flex-col items-start gap-1">
@@ -121,22 +135,47 @@ export function QueueTab(props: QueueTabProps) {
               </div>
             </ScrollArea>
 
-            <Card>
-              <CardContent className="grid gap-3 p-4">
+            <Card className="h-[320px] w-full max-w-full overflow-hidden py-0 md:h-[560px]">
+              <CardContent className="flex h-full min-w-0 flex-col gap-4 p-4">
                 {props.selectedQueueJob ? (
                   <>
-                    <p className="text-sm font-base">
-                      <strong>Status:</strong> {props.selectedQueueJob.status}
-                    </p>
-                    <p className="text-sm font-base">
-                      <strong>Progress:</strong> {props.selectedQueueJob.progress.completed}/
-                      {props.selectedQueueJob.progress.total || props.selectedQueueJob.totalChapters}
-                    </p>
-                    <Progress value={(progressValue / progressMax) * 100} />
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-heading uppercase tracking-wide">
+                      <p className="text-foreground/70">
+                        Status: <span className="text-foreground">{props.selectedQueueJob.status}</span>
+                      </p>
+                      <p className="text-foreground/70">
+                        Progress:{" "}
+                        <span className="text-foreground">
+                          {props.selectedQueueJob.progress.completed}/{props.selectedQueueJob.progress.total || props.selectedQueueJob.totalChapters}
+                        </span>
+                      </p>
+                    </div>
+                    <Progress className="h-3" value={(progressValue / progressMax) * 100} />
+
+                    {props.selectedQueueJob.movedToBookdrop ? (
+                      <p className="text-sm font-base text-foreground/90">
+                        Moved to: {props.selectedQueueJob.bookdropPath ? basenameFromPath(props.selectedQueueJob.bookdropPath) : "bookdrop"}
+                      </p>
+                    ) : null}
+
+                    {props.selectedQueueJob.error ? <p className="text-sm font-base text-destructive">{props.selectedQueueJob.error}</p> : null}
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <Checkbox id="show-logs" checked={props.showLogs} onCheckedChange={(checked) => props.setShowLogs(checked === true)} />
+                      <Label htmlFor="show-logs">Show logs</Label>
+                    </div>
+
+                    {props.showLogs && (
+                      <div className="queue-log-panel h-[170px] w-full max-w-full overflow-auto rounded-base border-2 border-border p-3 text-xs font-base md:h-[250px]">
+                        <pre className="whitespace-pre font-mono">
+                          {props.selectedQueueJobLogs.length ? props.selectedQueueJobLogs.join("\n") : "No logs yet..."}
+                        </pre>
+                      </div>
+                    )}
 
                     {!archiveMode && props.selectedQueueJob.status === "done" && props.selectedQueueJob.hasResult && (
                       <TooltipProvider>
-                        <div className="flex items-center gap-2">
+                        <div className="mt-auto flex items-center justify-end gap-2">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
@@ -171,25 +210,6 @@ export function QueueTab(props: QueueTabProps) {
                           </Tooltip>
                         </div>
                       </TooltipProvider>
-                    )}
-
-                    {props.selectedQueueJob.movedToBookdrop ? (
-                      <p className="text-sm font-base">
-                        Moved to: {props.selectedQueueJob.bookdropPath ? basenameFromPath(props.selectedQueueJob.bookdropPath) : "bookdrop"}
-                      </p>
-                    ) : null}
-
-                    {props.selectedQueueJob.error ? <p className="text-sm font-base text-destructive">{props.selectedQueueJob.error}</p> : null}
-
-                    <div className="flex items-center gap-2">
-                      <Checkbox id="show-logs" checked={props.showLogs} onCheckedChange={(checked) => props.setShowLogs(checked === true)} />
-                      <Label htmlFor="show-logs">Show logs</Label>
-                    </div>
-
-                    {props.showLogs && (
-                      <div className="h-[220px] overflow-auto rounded-base border-2 border-border bg-background p-2 text-xs font-base">
-                        <pre className="min-w-max whitespace-pre">{props.selectedQueueJobLogs.length ? props.selectedQueueJobLogs.join("\n") : "No logs yet..."}</pre>
-                      </div>
                     )}
                   </>
                 ) : (

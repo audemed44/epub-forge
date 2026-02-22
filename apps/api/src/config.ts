@@ -14,6 +14,28 @@ export type AppConfig = {
   legacyWebRoot: string;
 };
 
+function resolveCliPortArg(argv: string[]): number | null {
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (!token) {
+      continue;
+    }
+    if (token === "--port" || token === "-p") {
+      const candidate = argv[index + 1];
+      if (!candidate) {
+        return null;
+      }
+      const parsed = Number(candidate);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    if (token.startsWith("--port=")) {
+      const parsed = Number(token.slice("--port=".length));
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+  }
+  return null;
+}
+
 function resolveDataRoot(): string {
   if (process.env.DATA_ROOT) {
     return process.env.DATA_ROOT;
@@ -25,6 +47,7 @@ function resolveDataRoot(): string {
 }
 
 export function getAppConfig(): AppConfig {
+  const cliPort = resolveCliPortArg(process.argv.slice(2));
   const dataRoot = resolveDataRoot();
   const outputDir = process.env.EPUB_OUTPUT_DIR || path.join(dataRoot, "epubs");
   const bookdropDir = process.env.BOOKDROP_DIR || path.join(dataRoot, "bookdrop");
@@ -38,7 +61,7 @@ export function getAppConfig(): AppConfig {
   const legacyWebRoot = path.resolve(__dirname, "../../web/public");
 
   return {
-    port: Number(process.env.PORT || 3000),
+    port: cliPort ?? Number(process.env.PORT || 3000),
     dataRoot,
     outputDir,
     bookdropDir,

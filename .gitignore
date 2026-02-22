@@ -9,3 +9,4 @@ coverage/
 vendor/
 apps/web/dist/
 *.tsbuildinfo
+mockups/
