@@ -53,3 +53,12 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Delete old images (keep 3)
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: epub-forge
+          package-type: container
+          min-versions-to-keep: 3
+          ignore-versions: '^(latest|v.*)$'
+          token: ${{ secrets.GITHUB_TOKEN }}
