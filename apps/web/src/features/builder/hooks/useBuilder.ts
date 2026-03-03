@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { postJson } from "../../../shared/api/client";
+import { getJson, postJson } from "../../../shared/api/client";
 import { isPreviewResponse } from "../../../shared/api/guards";
 import type { ChapterRef, Metadata } from "../../../shared/types/api";
 
@@ -12,6 +12,8 @@ export function useBuilder({ onJobQueued }: UseBuilderOptions) {
   const [url, setUrl] = useState("");
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [isEnqueueing, setIsEnqueueing] = useState(false);
+  const [availableParsers, setAvailableParsers] = useState<string[]>([]);
+  const [selectedParserId, setSelectedParserId] = useState<string>("auto");
 
   const [parserId, setParserId] = useState<string | null>(null);
   const [chapters, setChapters] = useState<ChapterRef[]>([]);
@@ -52,6 +54,24 @@ export function useBuilder({ onJobQueued }: UseBuilderOptions) {
     [chapters, selectedRange.end, selectedRange.start]
   );
 
+  useEffect(() => {
+    async function loadParsers() {
+      const result = await getJson<{ parsers?: unknown }>("/api/health");
+      if (!result.ok) {
+        return;
+      }
+
+      const parsers = result.data.parsers;
+      if (!Array.isArray(parsers)) {
+        return;
+      }
+      const parserIds = parsers.filter((value): value is string => typeof value === "string");
+      setAvailableParsers(parserIds);
+    }
+
+    void loadParsers();
+  }, []);
+
   async function onPreview() {
     const inputUrl = url.trim();
     if (!inputUrl) {
@@ -62,7 +82,8 @@ export function useBuilder({ onJobQueued }: UseBuilderOptions) {
     setIsPreviewLoading(true);
 
     try {
-      const result = await postJson<unknown>("/api/preview", { url: inputUrl });
+      const parserIdForRequest = selectedParserId === "auto" ? null : selectedParserId;
+      const result = await postJson<unknown>("/api/preview", { url: inputUrl, parserId: parserIdForRequest });
       if (!result.ok || !isPreviewResponse(result.data)) {
         const message =
           typeof result.data === "object" &&
@@ -250,6 +271,9 @@ export function useBuilder({ onJobQueued }: UseBuilderOptions) {
     setUrl,
     isPreviewLoading,
     isEnqueueing,
+    availableParsers,
+    selectedParserId,
+    setSelectedParserId,
     parserId,
     chapters,
     startIndex,

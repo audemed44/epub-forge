@@ -214,6 +214,9 @@ export function AppShell() {
                   setUrl={builder.setUrl}
                   isPreviewLoading={builder.isPreviewLoading}
                   isEnqueueing={builder.isEnqueueing}
+                  availableParsers={builder.availableParsers}
+                  selectedParserId={builder.selectedParserId}
+                  setSelectedParserId={builder.setSelectedParserId}
                   parserId={builder.parserId}
                   chapters={builder.chapters}
                   startIndex={builder.startIndex}

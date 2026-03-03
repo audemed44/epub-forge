@@ -18,6 +18,9 @@ type BuilderTabProps = {
   setUrl: (value: string) => void;
   isPreviewLoading: boolean;
   isEnqueueing: boolean;
+  availableParsers: string[];
+  selectedParserId: string;
+  setSelectedParserId: (value: string) => void;
   parserId: string | null;
   chapters: ChapterRef[];
   startIndex: number;
@@ -88,7 +91,7 @@ export function BuilderTab(props: BuilderTabProps) {
           <CardTitle>Story URL</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3">
-          <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+          <div className="grid gap-2 md:grid-cols-[1fr_220px_auto]">
             <Input
               id="story-url"
               type="url"
@@ -96,6 +99,19 @@ export function BuilderTab(props: BuilderTabProps) {
               onChange={(event) => props.setUrl(event.target.value)}
               placeholder=""
             />
+            <Select value={props.selectedParserId} onValueChange={props.setSelectedParserId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Auto parser" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">Auto detect</SelectItem>
+                {props.availableParsers.map((parserId) => (
+                  <SelectItem key={parserId} value={parserId}>
+                    {parserId}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button onClick={() => void props.onPreview()} disabled={props.isPreviewLoading}>
               {props.isPreviewLoading ? "Loading..." : "Preview"}
             </Button>
