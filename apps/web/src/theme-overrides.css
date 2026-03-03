@@ -13,6 +13,7 @@
 
 :root[data-theme="blue-sky"] {
   --theme-body-background: linear-gradient(180deg, #08173e 0%, #061132 45%, #04102f 100%);
+  --theme-body-background-start: #08173e;
   --theme-color-background: 20.64% 0.056 262.9;
   --theme-color-surface: 29.48% 0.05 261.75;
   --theme-color-foreground: 94.17% 0.007 264.52;
@@ -28,6 +29,7 @@
 
 :root[data-theme="green"] {
   --theme-body-background: linear-gradient(180deg, #072b1f 0%, #041f17 52%, #031912 100%);
+  --theme-body-background-start: #072b1f;
   --theme-color-background: 23.5% 0.045 164;
   --theme-color-surface: 30.4% 0.043 165;
   --theme-color-foreground: 96.2% 0.01 160;
@@ -43,6 +45,7 @@
 
 :root[data-theme="red"] {
   --theme-body-background: linear-gradient(180deg, #341015 0%, #260b10 52%, #1c090d 100%);
+  --theme-body-background-start: #341015;
   --theme-color-background: 24.5% 0.052 18;
   --theme-color-surface: 31% 0.048 20;
   --theme-color-foreground: 96.5% 0.008 20;
@@ -58,6 +61,7 @@
 
 :root[data-theme="oled-sky-blue"] {
   --theme-body-background: linear-gradient(180deg, #000000 0%, #000000 100%);
+  --theme-body-background-start: #000000;
   --theme-color-background: 0% 0 0;
   --theme-color-surface: 19% 0 0;
   --theme-color-foreground: 98% 0 0;
@@ -73,6 +77,7 @@
 
 :root[data-theme="oled-green"] {
   --theme-body-background: linear-gradient(180deg, #000000 0%, #000000 100%);
+  --theme-body-background-start: #000000;
   --theme-color-background: 0% 0 0;
   --theme-color-surface: 19% 0 0;
   --theme-color-foreground: 98% 0 0;

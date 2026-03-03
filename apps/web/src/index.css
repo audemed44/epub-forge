@@ -10,6 +10,7 @@
     /* Editable theme tokens */
     --theme-font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
     --theme-body-background: linear-gradient(180deg, #08173e 0%, #061132 45%, #04102f 100%);
+    --theme-body-background-start: #08173e;
 
     --theme-color-background: 20.64% 0.056 262.9;
     --theme-color-surface: 29.48% 0.05 261.75;
@@ -81,6 +82,10 @@
 
   * {
     @apply border-border;
+  }
+
+  html {
+    background-color: var(--theme-body-background-start, #08173e);
   }
 
   body {
