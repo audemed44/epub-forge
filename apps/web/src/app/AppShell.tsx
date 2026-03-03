@@ -86,6 +86,7 @@ export function AppShell() {
     if (theme === "custom") {
       const customBackground = `linear-gradient(180deg, ${customTheme.backgroundStartHex} 0%, ${customTheme.backgroundEndHex} 100%)`;
       root.style.setProperty("--custom-theme-body-background", customBackground);
+      root.style.setProperty("--theme-body-background-start", customTheme.backgroundStartHex);
 
       for (const [key, cssVar] of customColorVarMap) {
         root.style.setProperty(cssVar, hexToOklchTriplet(customTheme[key] as string));
@@ -102,6 +103,7 @@ export function AppShell() {
 
     root.removeAttribute("data-custom-borders");
     root.style.removeProperty("--custom-theme-body-background");
+    root.style.removeProperty("--theme-body-background-start");
     for (const [, cssVar] of customColorVarMap) {
       root.style.removeProperty(cssVar);
     }
