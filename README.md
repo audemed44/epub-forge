@@ -1,12 +1,33 @@
 # epub-forge
 
-Self-hosted web app for downloading web fiction as EPUB files. Supported sites:
+Self-hosted web app for downloading web fiction as EPUB files.
+
+![Builder tab](docs/screenshots/builder.png)
+
+## Supported sites
 
 - `royalroad.com`
 - `novelfire.net`
 - `wanderinginn.com`
 - Generic WordPress-style sites
 - Any site with a sequential "next chapter" link pattern
+
+<details>
+<summary>More screenshots</summary>
+
+**Build Queue**
+
+![Queue tab](docs/screenshots/queue.png)
+
+**Configuration**
+
+![Config tab](docs/screenshots/config.png)
+
+</details>
+
+## Acknowledgements
+
+Inspired by [WebToEpub](https://github.com/dteviot/WebToEpub) by dteviot.
 
 ## Prerequisites
 

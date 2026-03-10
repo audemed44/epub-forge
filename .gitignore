@@ -10,3 +10,4 @@ vendor/
 apps/web/dist/
 *.tsbuildinfo
 mockups/
+scripts/take-screenshots.mjs
